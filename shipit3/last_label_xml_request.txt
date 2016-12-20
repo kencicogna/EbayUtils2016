@@ -1,0 +1,67 @@
+
+<LabelRequest ImageFormat="ZPLII" LabelType="International" LabelSubtype="Integrated" 
+                      Test="NO" LabelSize="4x6" ImageResolution="203" >
+  <AccountID>2502641</AccountID>
+  <CustomsCertify>TRUE</CustomsCertify>
+  <CustomsInfo>
+    <ContentsExplanation>Childs Toy</ContentsExplanation>
+    <ContentsType>Merchandise</ContentsType>
+    <CustomsItems>
+      <CustomsItem>
+        <CountryOfOrigin>US</CountryOfOrigin>
+        <Description>Childs Toy</Description>
+        <HSTariffNumber>950300</HSTariffNumber>
+        <Quantity>1</Quantity>
+        <Value>6.99</Value>
+        <Weight>1</Weight>
+      </CustomsItem>
+    </CustomsItems>
+    <EelPfc>NOEEI 30.37(a)</EelPfc>
+    <NonDeliveryOption>Return</NonDeliveryOption>
+  </CustomsInfo>
+  <CustomsSendersCopy>FALSE</CustomsSendersCopy>
+  <CustomsSigner>Amy Sepelis</CustomsSigner>
+  <DateAdvance>0</DateAdvance>
+  <Description>Childs Toy</Description>
+  <FromCity>Addison</FromCity>
+  <FromCountry>US</FromCountry>
+  <FromEMail>theteachingtoybox@gmail.com</FromEMail>
+  <FromName>The Teaching Toy Box</FromName>
+  <FromPhone>7081231234</FromPhone>
+  <FromPostalCode>60101</FromPostalCode>
+  <FromState>IL</FromState>
+  <IncludePostage>FALSE</IncludePostage>
+  <IntegratedFormType>Form2976</IntegratedFormType>
+  <MailClass>CommercialePacket</MailClass>
+  <MailpieceDimensions>
+    <Height>4</Height>
+    <Length>6</Length>
+    <Width>4</Width>
+  </MailpieceDimensions>
+  <MailpieceShape>Parcel</MailpieceShape>
+  <NonDeliveryOption>Return</NonDeliveryOption>
+  <PartnerCustomerID>TheTeachingToyBox</PartnerCustomerID>
+  <PartnerTransactionID>1</PartnerTransactionID>
+  <PassPhrase>its only a FLESH w0und!</PassPhrase>
+  <PrintConsolidatorLabel>TRUE</PrintConsolidatorLabel>
+  <RequesterID>lxxx</RequesterID>
+  <ReturnAddress1>415 W. Belden Avenue</ReturnAddress1>
+  <ReturnAddress2>Suite J</ReturnAddress2>
+  <Stealth>TRUE</Stealth>
+  <ToAddress1>U 1 94 Fletcher St</ToAddress1>
+  <ToCity>Essendon</ToCity>
+  <ToCountry>Australia</ToCountry>
+  <ToCountryCode>AU</ToCountryCode>
+  <ToEMail></ToEMail>
+  <ToName>Jesscia Bye</ToName>
+  <ToPhone>0400821995</ToPhone>
+  <ToPostalCode>3040</ToPostalCode>
+  <ToState>VIC</ToState>
+  <ValidateAddress>TRUE</ValidateAddress>
+  <Value>6.99</Value>
+  <WeightOz>1</WeightOz>
+
+  <ResponseOptions PostagePrice="TRUE" />
+  <Services RegisteredMail="OFF" USPSTracking="ON" />
+
+</LabelRequest>

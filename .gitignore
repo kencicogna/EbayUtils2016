@@ -1,3 +1,17 @@
+# Specific Files
+shipping_cost_fix.csv
+shipping_cost_fix.errors.csv
+shipping_cost_fix.noweights.csv
+*shipping*comparison.xls
+cache/
+*.EPL2
+Endicia*/token.txt
+*~
+.gitignore
+
+# GVim swap files
+*.swp
+
 # Windows image file caches
 Thumbs.db
 ehthumbs.db
@@ -45,3 +59,8 @@ $RECYCLE.BIN/
 Network Trash Folder
 Temporary Items
 .apdisk
+fix_shipping/shipping comparison.xls
+fix_shipping/shipping_cost_fix.csv
+fix_shipping/shipping_cost_fix.errors.csv
+*.csv
+*.swo
