@@ -49,10 +49,10 @@ sub load {
 
   # Get Next package id
   # TODO: delete?
-#  $sql = 'select next_batch_id from TTY_Next_ID';
-#  $sth = $self->dbh->prepare($sql) || die "\nERROR: failed to prepare statement. SQL: $sql";
-#  $sth->execute()               || die "\nERROR: failed to get next batch ID. SQL: $sql";
-#  my $nextid = ($sth->fetchrow_array);
+  #  $sql = 'select next_batch_id from TTY_Next_ID';
+  #  $sth = $self->dbh->prepare($sql) || die "\nERROR: failed to prepare statement. SQL: $sql";
+  #  $sth->execute()               || die "\nERROR: failed to get next batch ID. SQL: $sql";
+  #  my $nextid = ($sth->fetchrow_array);
   my $nextid = 0;
 
   # TODO: Some of these values only apply to BlackThorne
