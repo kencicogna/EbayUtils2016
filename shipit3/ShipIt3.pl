@@ -1076,11 +1076,11 @@ sub btn_print_onClick {
   #   - Currently supporting two ways (1) Create XML file for Dazzle  
   #                                   (2) Call Endicia API
   #
-#   if ( $self->{pkg}->dom_intl_flag eq 'I' ) {
-  if (1) {
+  if ( $self->{pkg}->dom_intl_flag eq 'I' ) {  
+#  if (1) {
     # API based processing
     $self->banner('note','Calling Endicia GetPostageLabel API...'); # Input to postage software
-    my $objEndiciaCall = EndiciaAPICall->new( environment=>'development' );
+    my $objEndiciaCall = EndiciaAPICall->new( environment=>$self->{environment} );
     $self->{pkg}->date_advance( $self->{DateAdvance} );
 
     eval {
@@ -1089,7 +1089,9 @@ sub btn_print_onClick {
     if($@) {
       $self->banner('error','Error in API call or printing label'); # Input to postage software
       $self->warning_dialog( "ERROR: Endicia API Call error. \nError Message: $@" ); 
-      die $@;
+      $self->{pkg}->status('PE');
+      # die $@;
+      return 1;
     }
 
     if ( ! $objEndiciaCall->TrackingNumber ) {
@@ -1653,7 +1655,9 @@ sub dd_config_environment_evtChoice {
   #       this way only allows for 'production' and 'development' 
   my $env              = $environment=~/.*production.*/i ? 'production' : 'development';
   my $type             = $environment=~/.*production.*/i ? 'important' : 'note';
-  $self->{environment} = $environment;
+  $self->{environment} = $env;
+
+  $self->logit('note',"Environment is '$self->{environment}'");
 
   if ( ! -e $configuration_file ) {
     print "config file doesn't exist: '$configuration_file'";
@@ -1925,7 +1929,6 @@ sub tc_oz_evtTextEnter {
   else {
     # Automatically set the  mail class
 
-    # TODO: This should be using the mailcall/mailpiece table defined ( $self->{mail_map} )
 
     #
     # DOMESTIC
@@ -1981,7 +1984,7 @@ sub tc_oz_evtTextEnter {
         $mail_piece = $mc->{'E-Packet'}->{mailpiece};
       }
       else {
-        $self->warning_dialog( "Sending IPA. ",$p->countryname," is not eligible for ePacket." ); 
+        #$self->warning_dialog( "Sending IPA. ",$p->countryname," is not eligible for ePacket." ); 
         $mail_class = $mc->{IPA}->{mailclass};
         $mail_piece = $mc->{IPA}->{mailpiece};
       }
@@ -2001,7 +2004,7 @@ sub tc_oz_evtTextEnter {
     $p->status('WC'); # Weight Changed
 
     # Compare to Expected weight
-    if ( ! $self->is_expected_weight() ) {
+    if ( $p->total_items == 1 && ! $self->is_expected_weight() ) {
       my $type = $self->{type};
       $self->{current_package_idx}->{$type}--;
       # Reload page
@@ -2028,22 +2031,29 @@ sub save_actual_weight {
   my $item = $pkg->items->[0];
   my $title = $item->title;
   my $variation = $item->variation;
+  my $pkg_weight = $pkg->total_weight_oz;
 
   my $sql = q/update tty_storagelocation set packaged_weight=? where title=? and isnull(variation,' ')=isnull(?,' ') and active=1/;
   my $sth;
 
   eval {
     $sth = $self->{dbh}->prepare( $sql );
-    $sth->execute( $pkg->total_weight_oz, $title, $variation );
+    $sth->execute( $pkg_weight, $title, $variation );
     $sth->finish();
   };
   if ($@) {
     die "btn_save_pkg_evtClick error: $@";
   }
 
-  $item->packaged_weight( $pkg->total_weight_oz );
-  $self->{grid}->SetCellValue( 0, 6, $pkg->total_weight_oz  );
+  for my $p ( @{$self->{packages}->{ALL}} ) {
+    for my $i ( @{ $p->items } ) {
+      if ( $i->title eq $title && $i->variation eq $variation ) {
+        $i->packaged_weight( $pkg_weight );
+      }
+    }
+  }
 
+  $self->{grid}->SetCellValue( 0, 6, $pkg_weight  );
   $self->banner('info','Packaged Weight Saved');
 }
 
@@ -2059,10 +2069,12 @@ sub is_expected_weight {
   my $actual_weight = $self->{pkg}->total_weight_oz;                  # Entered by user
   my $expected_weight = $self->{pkg}->items->[0]->packaged_weight;    # on the DB
 
+  # If there's a current value on the database, then check if the value entered is within one ounce,
+  # else record new weight in db
   if ( $expected_weight ) {
     if ( $actual_weight > $expected_weight+1 || $actual_weight < $expected_weight-1 ) {
       $self->banner('error','Weight is different than expected');
-      my $rc = $self->yes_no_dialog("WARNING: The weight of $actual_weight oz. is not the same as the expected weight of $expected_weight oz. \n\nDo you still want to proceed?");
+      my $rc = $self->yes_no_dialog("WARNING: The weight of $actual_weight oz. is not the same as the expected weight of $expected_weight oz. \n\nDo you want to save new weight and proceed?");
 
       if ( $rc ) {
         $self->save_actual_weight();
@@ -2202,7 +2214,7 @@ my ($self, $event) = @_;
   my $packaging_type = $self->{dd_packaging}->GetStringSelection();
   my $bubble_wrap = $self->{dd_bubble_wrap}->GetStringSelection();
 
-  $self->yes_no_dialog( "Update packaging details? y/n" ); 
+  #$self->yes_no_dialog( "Update packaging details? y/n" ); 
 
   # Save packaging details 
   my $item = $self->{pkg}->items->[0];
@@ -2222,8 +2234,14 @@ my ($self, $event) = @_;
     die "btn_save_pkg_evtClick error: $@";
   }
 
-  $item->packaging( $packaging_type );
-  $item->bubble_wrap( $bubble_wrap );
+  for my $p ( @{$self->{packages}->{ALL}} ) {
+    for my $i ( @{ $p->items } ) {
+      if ( $i->title eq $title && $i->variation eq $variation ) {
+        $i->packaging( $packaging_type );
+        $i->bubble_wrap( $bubble_wrap );
+      }
+    }
+  }
 
   $self->{grid}->SetCellValue( 0, 4, $packaging_type  );
   $self->{grid}->SetCellValue( 0, 5, $bubble_wrap  );
