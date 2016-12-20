@@ -233,8 +233,9 @@ sub load {
 
         $h->{title}             = $i->{Item}->{Title};
         if ( $h->{title} =~ /.*\]$/ ) {
-          $h->{variation}         = $h->{title};
-          $h->{variation}         =~ s/^.*\[(.*?)\]$/$1/;
+          $h->{variation} = $h->{title};
+          $h->{variation} =~ s/^.*\[(.*?)\]$/$1/;
+          $h->{title}     =~ s/\s*\[.*?\]$//; 
           #$h->{variation}         =~ s/"/''/g;
         }
         else {
