@@ -29,10 +29,6 @@ has sql           => ( is => 'rw', isa => 'Str', );
 has dbh           => ( is => 'ro', isa => 'Object', );
 has packageTypes  => ( is => 'rw', isa => 'HashRef',  default => sub { {} } );
 
-# TODO:
-#   1. add method to update database when either packageing or bubble wrap change
-#       - have popup to confirm
-#   2. compare expected weight with actual
 
 #-------------------------------------------------------------------------------
 # Methods
@@ -86,16 +82,20 @@ sub load {
   || die "\n\nDatabase connection not made: $DBI::errstr\n\n";
 
   # SQL - Prepare Insert to PickList table
-  # TODO: change this table name from picklist_test to picklist?
-  my $sthpl = $dbhpl->prepare( 'insert into picklist_test (location, image_url, quantity, title, variation, di_flag) values (?,?,?,?,?,?)') or die "can't prepare stmt";
+  #
+  # my $sthpl = $dbhpl->prepare( 'insert into picklist_test (location, image_url, quantity, title, variation, di_flag) values (?,?,?,?,?,?)') or die "can't prepare stmt";
+  my $sthpl = $dbhpl->prepare( 'insert into picklist (location, image_url, quantity, title, variation, di_flag) values (?,?,?,?,?,?)') or die "can't prepare stmt";
 
   # Truncate existing PickList table
-  $dbhpl->do( 'truncate table picklist_test' ) or die "can't execute stmt";
+  # $dbhpl->do( 'truncate table picklist_test' ) or die "can't execute stmt";
+  $dbhpl->do( 'truncate table picklist' ) or die "can't execute stmt";
 
   # Load the locations data
+  #
   # and create location and packaging lookup
   eval {
-    $sth = $dbhpl->prepare( 'select title,variation,location,packaging,bubblewrap,packaged_weight from tty_storagelocation where title is not null and active=1' ) 
+#     $sth = $dbhpl->prepare( 'select title,variation,location,packaging,bubblewrap,packaged_weight from tty_storagelocation where title is not null and active=1' ) 
+    $sth = $dbhpl->prepare( 'select title,variation,location,packaging,bubblewrap,packaged_weight from Inventory where title is not null and active=1' ) 
       or die "can't prepare sql to get location data";
     $sth->execute() or die "can't execute sql to get location data";
   };

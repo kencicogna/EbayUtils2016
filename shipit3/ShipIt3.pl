@@ -2033,7 +2033,8 @@ sub save_actual_weight {
   my $variation = $item->variation;
   my $pkg_weight = $pkg->total_weight_oz;
 
-  my $sql = q/update tty_storagelocation set packaged_weight=? where title=? and isnull(variation,' ')=isnull(?,' ') and active=1/;
+  #my $sql = q/update tty_storagelocation set packaged_weight=? where title=? and isnull(variation,' ')=isnull(?,' ') and active=1/;
+  my $sql = q/update Inventory set packaged_weight=? where title=? and isnull(variation,' ')=isnull(?,' ') and active=1/;
   my $sth;
 
   eval {
@@ -2221,7 +2222,9 @@ my ($self, $event) = @_;
   my $title = $item->title;
   my $variation = $item->variation;
 
-  my $sql = qq/update tty_storagelocation set packaging=?, bubblewrap=? 
+  # my $sql = qq/update tty_storagelocation set packaging=?, bubblewrap=? 
+  #               where title=? and isnull(variation,' ')=isnull(?,' ') and active=1/;
+  my $sql = qq/update Inventory set packaging=?, bubblewrap=? 
                 where title=? and isnull(variation,' ')=isnull(?,' ') and active=1/;
   my $sth;
 
