@@ -84,7 +84,8 @@ sub load {
   # SQL - Prepare Insert to PickList table
   #
   # my $sthpl = $dbhpl->prepare( 'insert into picklist_test (location, image_url, quantity, title, variation, di_flag) values (?,?,?,?,?,?)') or die "can't prepare stmt";
-  my $sthpl = $dbhpl->prepare( 'insert into picklist (location, image_url, quantity, title, variation, di_flag) values (?,?,?,?,?,?)') or die "can't prepare stmt";
+  my $sthpl = $dbhpl->prepare( 'insert into picklist (location, image_url, quantity, title, variation, di_flag, sku, item_picked) values (?,?,?,?,?,?,?,0)') 
+                  or die "can't prepare stmt";
 
   # Truncate existing PickList table
   # $dbhpl->do( 'truncate table picklist_test' ) or die "can't execute stmt";
@@ -95,7 +96,7 @@ sub load {
   # and create location and packaging lookup
   eval {
 #     $sth = $dbhpl->prepare( 'select title,variation,location,packaging,bubblewrap,packaged_weight from tty_storagelocation where title is not null and active=1' ) 
-    $sth = $dbhpl->prepare( 'select title,variation,location,packaging,bubblewrap,packaged_weight from Inventory where title is not null and active=1' ) 
+    $sth = $dbhpl->prepare( 'select title,variation,location,packaging,bubblewrap,packaged_weight,sku from Inventory where title is not null and active=1' ) 
       or die "can't prepare sql to get location data";
     $sth->execute() or die "can't execute sql to get location data";
   };
@@ -119,6 +120,7 @@ sub load {
     $location_map->{ $t }->{ $v }->{packaging} = $r->[3]; 
     $location_map->{ $t }->{ $v }->{bubble_wrap} = $r->[4]; 
     $location_map->{ $t }->{ $v }->{packaged_weight} = $r->[5]; 
+    $location_map->{ $t }->{ $v }->{SKU} = $r->[6]; 
   }
 
   # Get the list of packages
@@ -362,7 +364,7 @@ sub load {
     ## GET ITEM LOCATION IF IT EXISTS
     ##
     my $item_location;
-    my ( $packaging, $bubble_wrap, $packaged_weight );
+    my ( $packaging, $bubble_wrap, $packaged_weight, $sku );
     my $pl_title =  $r->{title};
     $pl_title =~ s/\[.*?\]$//;
     my $pl_variation = $r->{variationxmlkey} || ' ';
@@ -371,11 +373,13 @@ sub load {
       $packaging = $location_map->{ $pl_title }->{ "$pl_variation" }->{packaging};
       $bubble_wrap = $location_map->{ $pl_title }->{ "$pl_variation" }->{bubble_wrap};
       $packaged_weight = $location_map->{ $pl_title }->{ "$pl_variation" }->{packaged_weight};
+      $sku = $location_map->{ $pl_title }->{ "$pl_variation" }->{SKU};
     }
 
     # add item to pick list
     $pick_list->{ $pkg->dom_intl_flag }->{ $item_location }{ $pl_title }->{ $pl_variation }->{QTY} += $r->{qtysold};
     $pick_list->{ $pkg->dom_intl_flag }->{ $item_location }{ $pl_title }->{ $pl_variation }->{IMG} = $picture;      
+    $pick_list->{ $pkg->dom_intl_flag }->{ $item_location }{ $pl_title }->{ $pl_variation }->{SKU} = $sku;      
 
     # Build array of items in package
     my $item;
@@ -526,18 +530,21 @@ sub load {
       for my $title ( sort keys %{$pl->{$loc}} ) {
         for my $var ( sort keys %{$pl->{$loc}->{$title}} ) {
           my $cnt = $pl->{$loc}->{$title}->{$var}->{QTY};
+
+          # TODO: for sizing Excel columns. Remove Excel file altogether.
           $maxloc = length($loc) > $maxloc ? length($loc) : $maxloc;
           $maxcnt = length($cnt) > $maxcnt ? length($cnt) : $maxcnt;
           $maxtitle = length($title) > $maxtitle ? length($title) : $maxtitle;
           $maxvar = length($var) > $maxvar ? length($var) : $maxvar;
-
           $ws->write($row,0,$loc);
           $ws->write($row,1,$cnt,$fmt_center);
           $ws->write($row,2,$title);
           $ws->write($row,3,$var);
 
           my $image_url = $pl->{$loc}->{$title}->{$var}->{IMG};
-          $sthpl->execute( $loc, $image_url, $cnt, $title, $var, $diflag ) or die "can't update PickList table";
+          my $sku = $pl->{$loc}->{$title}->{$var}->{SKU};
+
+          $sthpl->execute( $loc, $image_url, $cnt, $title, $var, $diflag, $sku ) or die "can't update PickList table";
 
           $row++;
         }
