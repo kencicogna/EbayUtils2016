@@ -18,6 +18,9 @@ use POSIX;
 use Getopt::Std;
 use Storable 'dclone';
 
+use lib '../cfg';
+use EbayConfig;
+
 my %opts;
 getopts('i:raDI:O:',\%opts);
 # -i <ebay item ID>		- perform operations on this single item
@@ -80,7 +83,7 @@ $header->push_header('X-EBAY-API-SITEID'    => '0');                            
 $header->push_header('Content-Type'         => 'text/xml');
 
 # eBayAuthToken
-my $eBayAuthToken = 'AgAAAA**AQAAAA**aAAAAA**CQTJVA**nY+sHZ2PrBmdj6wVnY+sEZ2PrA2dj6wHlIKoCZCBogmdj6x9nY+seQ**4EwAAA**AAMAAA**IjIgU4Mg/eixJ7OQDRd60pU4NWyjtHgmki3+78wP5Vdt8qXeUz9lAbiDgkWaTbHHxBS2J+GvPSZZ9c+24CHqWIxORvV0OK1M176YGUAUPY7YXq8Z2XSTUp+pmq7In/SjzNc17Aqg+CUZsYDn1mnyoRGyW3rT5uk6TtCStBcckV1q55Jg0JomVxUtC68NPC+4JDCqOEqHVOok7pTR8dNa7wTZiSZCoKodX7c8wnBStPkGHhw3G3ogeU0FmKudl1IMsV1zUlJ0E5dCq9GF/2wxgQQAdH29RXcVUHKDE5zAXSmUIvrmIRKG2xDOnxUSjsRMQJZ8dN/wEKXtjQK4NYCBqwmqo+7uMsUwbqjF6X320t/eksCLbG8tL+QtLN9PwrpbAUnnMHnn/LI+sEb1BaFHBI0O9eqYKJII/bVaYwFNilqq4qe1wR+qF2Ge9Fa6jYvdKMwhVvYZmily6mIDhJEX4VUQ3B9wx6tx6Bnm49/2LNblVY+toRI+rqdMnjVAQTXPeWzxmUqSK4Ql0Jn7pm0ul7v9Zt9/LYNRpjId7NoEC//q/5rvBxGIBSLe3KzrSR2r/Xuu9IMfrJbq3bvoMBpgr5Iy7+K2vXPmfXkQ3VuXocoAJIvuZTrSLIY6DSqfdc5oxk0RObGcShP+grojI1FpWGULDDYM5Uxlbj3FNSGc7X/U2MslXt0dZ5Ao0dtf4oz63oEHQV1sfEToouUEhML7Sz9exfEfZy35LqR6RuTOXDyTG1gFweFCkK6F54eZgdLZ';
+my $eBayAuthToken = $EbayConfig::ES_eBayAuthToken;
 
 my $request_getStore_default = <<END_XML;
 <?xml version='1.0' encoding='utf-8'?>
@@ -186,7 +189,8 @@ my $dbh;
 eval {
 	# Open database connection
 	$dbh =
-	DBI->connect( "DBI:ODBC:BTData_PROD_SQLEXPRESS",
+	#DBI->connect( "DBI:ODBC:BTData_PROD_SQLEXPRESS",
+	DBI->connect( "DBI:ODBC:BTData_DEV_SQLEXPRESS",
 							  'shipit',
 							  'shipit',
 							  { 
