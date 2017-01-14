@@ -460,7 +460,7 @@ sub load {
 
     # TODO: still needs to be fixed as of 2015/04/04 !!!
     # Fix foreign characters (unicode/UTF8)
-    for my $unicode_field ( qw(firstname lastname company address addressline1 addressline2 addressline3 city state countryname) )
+    for my $unicode_field ( qw(firstname lastname company address addressline1 addressline2 addressline3 city state countryname buyer notes) )
     {
     #  print "\nB:",$pkg->$unicode_field;
       my $fix = $pkg->$unicode_field;
