@@ -1,5 +1,6 @@
 package ShipItEbayAPICallGetOrders;
 
+use utf8;
 use strict;
 use Moose;
 use ShipItEbayAPICallGetMyEbaySelling;

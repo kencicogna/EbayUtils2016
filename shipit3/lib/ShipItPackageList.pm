@@ -464,6 +464,7 @@ sub load {
     {
     #  print "\nB:",$pkg->$unicode_field;
       my $fix = $pkg->$unicode_field;
+      utf8::decode($fix);
       $fix =~ s/&amp;#7;//g;
       $pkg->$unicode_field( $fix );
 

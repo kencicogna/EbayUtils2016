@@ -1,5 +1,6 @@
 package ShipItEbayAPICallGetMyEbaySelling;
 
+use utf8;
 use strict;
 use Moose;
 
