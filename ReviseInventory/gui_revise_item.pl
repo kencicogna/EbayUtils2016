@@ -31,7 +31,7 @@ use Data::Dumper 'Dumper';			$Data::Dumper::Sortkeys = 1;
 use File::Copy qw(copy move);
 use POSIX;
 use Getopt::Std;
-use List::MoreUtils qw/ uniq /;
+use List::MoreUtils qw/uniq/;
 
 use EbayConfig;
 
@@ -40,11 +40,9 @@ getopts('u',\%opts);
 
 my $UPDATE_LOC = $opts{u} ? 1 : 0;
 
-chdir('C:/Users/Amy/Documents/revise_item/');				# amylsptop
-#chdir('C:/Users/Owner/Documents/revise_item/');	  # TTBSERVER
+chdir('C:/Users/Owner/Documents/revise_item/');	  # TTBSERVER
 
 our $DEBUG            = 0;
-#our $ODBC             = 'BTData_SQLEXPRESS';       # amylaptop dev
 our $ODBC             = 'BTData_PROD_SQLEXPRESS';   # TTBSERVER
 our $PROD_ENVIRONMENT = 1;
 our $REFRESH = 1;
@@ -131,27 +129,15 @@ for ( my $i=0; $i<@all_suppliers; $i++ ) {
 # EBAY API INFO                                   #
 ###################################################
 
-# define the HTTP header
-my $objHeader = HTTP::Headers->new;
-$objHeader->push_header('X-EBAY-API-COMPATIBILITY-LEVEL' => '939');
-$objHeader->push_header('X-EBAY-API-DEV-NAME'  => 'd57759d2-efb7-481d-9e76-c6fa263405ea');
-$objHeader->push_header('X-EBAY-API-APP-NAME'  => 'KenCicog-a670-43d6-ae0e-508a227f6008');
-$objHeader->push_header('X-EBAY-API-CERT-NAME' => '8fa915b9-d806-45ef-ad4b-0fe22166b61e');
-$objHeader->push_header('X-EBAY-API-CALL-NAME' => 'ReviseFixedPriceItem');
-$objHeader->push_header('X-EBAY-API-SITEID'    => '0'); # usa
-$objHeader->push_header('Content-Type'         => 'text/xml');
+# $objHeader->push_header('X-EBAY-API-CALL-NAME' => 'ReviseFixedPriceItem');
+# $objHeaderGetItem->push_header('X-EBAY-API-CALL-NAME' => 'GetItem');
 
-my $objHeaderGetItem = HTTP::Headers->new;
-$objHeaderGetItem->push_header('X-EBAY-API-COMPATIBILITY-LEVEL' => '939');
-$objHeaderGetItem->push_header('X-EBAY-API-DEV-NAME'  => 'd57759d2-efb7-481d-9e76-c6fa263405ea');
-$objHeaderGetItem->push_header('X-EBAY-API-APP-NAME'  => 'KenCicog-a670-43d6-ae0e-508a227f6008');
-$objHeaderGetItem->push_header('X-EBAY-API-CERT-NAME' => '8fa915b9-d806-45ef-ad4b-0fe22166b61e');
-$objHeaderGetItem->push_header('X-EBAY-API-CALL-NAME' => 'GetItem');
-$objHeaderGetItem->push_header('X-EBAY-API-SITEID'    => '0'); # usa
-$objHeaderGetItem->push_header('Content-Type'         => 'text/xml');
+# Ebay API Request Headers
+our $header = $EbayConfig::ES_http_header;
 
-# eBayAuthToken
-my $eBayAuthToken = $EbayConfig::ES_eBayAuthToken;
+# Ebay Authentication Token
+our $eBayAuthToken = $EbayConfig::ES_eBayAuthToken;
+
 
 # define the XML request
     my $request_getmyebayselling = <<END_XML;
@@ -334,9 +320,9 @@ Wx::Event::EVT_BUTTON($self, $self->{btn_clear_form}->GetId, \&btn_clear_form_on
   ###########################################################
   # USER DEFINED VARIABLES                                  #
   ###########################################################
-  $self->{objHeader}           = $objHeader;
-  $self->{objHeaderReviseItem} = $objHeader;
-  $self->{objHeaderGetItem}    = $objHeaderGetItem;
+  $self->{objHeader}           = $header;
+  $self->{objHeaderReviseItem} = $header;
+  $self->{objHeaderGetItem}    = $header;
 
   $self->{request_reviseitem_default} = $request_reviseitem_default;
   $self->{request_getitem_default}    = $request_getitem_default;
