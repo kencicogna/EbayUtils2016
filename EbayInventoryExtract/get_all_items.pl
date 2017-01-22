@@ -19,7 +19,7 @@ use lib '../cfg';
 use EbayConfig;
 
 my %opts;
-getopts('i:raDI:O:',\%opts);
+getopts('i:aDI:O:p',\%opts);
 # -i <ebay item ID>		- perform operations on this single item
 # -a                  - perform operations on all items
 # -r 									- revise item(s)
@@ -40,7 +40,7 @@ else {
 	die "must supply either option '-i <item id>' or '-a' option";
 }
 
-my $REVISE_ITEM = defined $opts{r} ? 1 : 0;
+my $PRODUCTION  = defined $opts{p} ? 1 : 0;
 my $DEBUG       = defined $opts{D} ? 1 : 0;
 my $infile      = defined $opts{I} ? $opts{I} : '';
 my $outfile     = defined $opts{O} ? $opts{O} : 'lw_import';
@@ -151,13 +151,14 @@ open my $ofh_DES, '>', $of_DES or die "can't open file $of_DES";
 open my $ofh_VG , '>', $of_VG  or die "can't open file $of_VG ";
 open my $ofh_SIV, '>', $of_SIV or die "can't open file $of_SIV";
 
+my $connectionString = $PRODUCTION ? "DBI:ODBC:BTData_PROD_SQLEXPRESS" : "DBI:ODBC:BTData_DEV_SQLEXPRESS";
+
 # Connect to Database
 my $dbh;
 eval {
 	# Open database connection
 	$dbh =
-	#DBI->connect( "DBI:ODBC:BTData_PROD_SQLEXPRESS",
-	DBI->connect( "DBI:ODBC:BTData_DEV_SQLEXPRESS",
+	DBI->connect( $connectionString,
 							  'shipit',
 							  'shipit',
 							  { 
@@ -346,9 +347,22 @@ for my $item_id ( reverse @all_items ) {
   my $SI = $S->{InternationalShippingServiceOption};    # Shipping International
 
   # Get weight from EBAY
-  my $majorweight = defined $S->{ShippingPackageDetails}->{WeightMajor} ? $S->{ShippingPackageDetails}->{WeightMajor} : 0;
-  my $minorweight = defined $S->{ShippingPackageDetails}->{WeightMinor} ? $S->{ShippingPackageDetails}->{WeightMinor} : 0;
-  my $ebayWeight = ($majorweight * 16) + $minorweight;
+  my $majorweight = POSIX::floor($ebayListing->{weight} / 16);
+  my $minorweight = $ebayListing->{weight} % 16;
+  my $totalweight = $ebayListing->{weight};
+  my $ebaymajorweight = defined $S->{ShippingPackageDetails}->{WeightMajor} ? $S->{ShippingPackageDetails}->{WeightMajor}->{content} : 0;
+  my $ebayminorweight = defined $S->{ShippingPackageDetails}->{WeightMinor} ? $S->{ShippingPackageDetails}->{WeightMinor}->{content} : 0;
+  my $ebayWeight = ($ebaymajorweight * 16) + $ebayminorweight;
+
+  # Weight
+  if ( ($ebayListing->{weight} != $ebayWeight) ) { # in total ouches
+    print $ofh_ERR "WARNING: itemid=$item_id - weight differs from ebay and Inventory tables";
+  }
+
+  # Use weight in Inventory table first, then Ebay ( TODO: might want to change this )
+  $majorweight = $majorweight ? $majorweight : $ebaymajorweight;
+  $minorweight = $minorweight ? $minorweight : $ebayminorweight;
+  $totalweight = $totalweight ? $totalweight : $ebayWeight;
 
   # Get Domestic shipping rates
   my ($StdShipping, $StdShipAddl, $PriShipping, $PriShipAddl, $DomShipProfID );
@@ -365,11 +379,11 @@ for my $item_id ( reverse @all_items ) {
             $SS->{ShippingService} eq 'USPSParcel' or 
             $SS->{ShippingService} eq 'USPSStandardPost' ) {   
 
-      if ( $ebayWeight > 15.9 ) {
+      if ( $totalweight > 15.9 ) {
         $PriShipping = $SS->{ShippingServiceCost}->{content};
         $PriShipAddl = $SS->{ShippingServiceAdditionalCost}->{content};
       }
-      elsif ( $ebayWeight >0 and $ebayWeight <= 15.9 )  {
+      elsif ( $totalweight >0 and $totalweight <= 15.9 )  {
         $StdShipping = $SS->{ShippingServiceCost}->{content};
         $StdShipAddl = $SS->{ShippingServiceAdditionalCost}->{content};
       }
@@ -463,7 +477,7 @@ for my $item_id ( reverse @all_items ) {
   my $brand = $itemSpecificsHash->{Brand} ? $itemSpecificsHash->{Brand} : "";
   my $mpn   = $itemSpecificsHash->{MPN} ? $itemSpecificsHash->{MPN} : "";
   my $fullDescription  = $ebayListing->{DESCRIPTION};
-  $fullDescription =~ s/"/""/;
+  $fullDescription =~ s/"/""/g;
 
   ###########################################################################################################################
   #
@@ -530,6 +544,20 @@ for my $item_id ( reverse @all_items ) {
 
       my $cost = $var->{cost} || '0';
 
+      # Weight
+      my $majorweight = POSIX::floor($var->{weight} / 16);
+      my $minorweight = $var->{weight} % 16;
+      my $totalweight = $var->{weight};
+      
+      if ( ($var->{weight} != $ebayWeight) ) { # in total ouches
+        print $ofh_ERR "WARNING: itemid=$item_id - weight differs from ebay and Inventory tables";
+      }
+
+      # Use weight in Inventory table first, then Ebay ( TODO: might want to change this )
+      $majorweight = $majorweight ? $majorweight : $ebaymajorweight;
+      $minorweight = $minorweight ? $minorweight : $ebayminorweight;
+      $totalweight = $totalweight ? $totalweight : $ebayWeight;
+
       # Variation Image
       my ($imageurl, $vpic2, $vpic3);
       if ( ref($variationImages->{$variation}) =~ /ARRAY/i ) {
@@ -565,7 +593,7 @@ for my $item_id ( reverse @all_items ) {
       my $minimumLevel     = 1;
       my $unitCost         = $cost;
       my $stockValue       = $stockLevel * $unitCost;
-      my $location         = 'Default';
+      my $location         = 'ADDI';
       my $binRack          = $var->{location} || '0-0-0';
 
       # Parent SKU related values
@@ -662,7 +690,7 @@ for my $item_id ( reverse @all_items ) {
       print $ofh_AA qq/"$title",$item_id,$variationSKU,$parentSKU,$variationSKU,$barcode,"yes",/; # Matrix Item = Variation (i.e. "yes")
       print $ofh_AA qq/,,,,,,,,/;
       print $ofh_AA qq/,$ebayVariationType,$variationSKU,$storeCategoryName,$brand,$mpn,,/;
-      print $ofh_AA qq/,"$fullDescription",$unitCost,'ADDI',$stockLevel,$location,1,/;
+      print $ofh_AA qq/,"$fullDescription",$unitCost,$location,$stockLevel,$binRack,1,/;
       print $ofh_AA qq/admin,yes,no,$retailPrice,$supplier,/;
       print $ofh_AA qq/,,,,,/;
       print $ofh_AA qq/,,,,,taxable,/;
@@ -743,13 +771,26 @@ for my $item_id ( reverse @all_items ) {
       die;
     }
 
+    # Weight
+    my $majorweight = POSIX::floor($slt->{weight} / 16);
+    my $minorweight = $slt->{weight} % 16;
+    my $totalweight = $slt->{weight};
+    
+    if ( ($slt->{weight} != $ebayWeight) ) { # in total ouches
+      print $ofh_ERR "WARNING: itemid=$item_id - weight differs from ebay and Inventory tables";
+    }
+
+    # Use weight in Inventory table first, then Ebay ( TODO: might want to change this )
+    $majorweight = $majorweight ? $majorweight : $ebaymajorweight;
+    $minorweight = $minorweight ? $minorweight : $ebayminorweight;
+    $totalweight = $totalweight ? $totalweight : $ebayWeight;
+
     my $cost = $slt->{cost} || '0';
 
     # Images
     my $imageurl = $ebayListing->{PictureDetails}->{ExternalPictureURL} || $ebayListing->{IMAGE1};
     my $pic2     = $ebayListing->{IMAGE2};
     my $pic3     = $ebayListing->{IMAGE3};
-
 
     # UPC Validation
     if ( ($itemSpecificsHash->{UPC} && $slt->{upc}) && 
@@ -774,7 +815,7 @@ for my $item_id ( reverse @all_items ) {
     my $minimumLevel     = 1;
     my $unitCost         = $cost;
     my $stockValue       = $stockLevel * $unitCost;
-    my $location         = 'Default';
+    my $location         = 'ADDI';
     my $binRack          = $slt->{location} || '0-0-0';
 
     no warnings;
@@ -790,14 +831,14 @@ for my $item_id ( reverse @all_items ) {
     if ( ! $imageurl )        { print $ofh_ERR "\nERROR: Cannot determine PRIMARY Image!!!      TITLE: '$title' VAR: '$variation'\n"; }
 
     # AgileIron Product Import
-    print $ofh_AA qq/"$title",$item_id,,$SKU,,$barcode,"yes",/; # Matrix Item = Variation (i.e. "yes")
+    print $ofh_AA qq/"$title",$item_id,$SKU,,$SKU,$barcode,no,/; # MatrixItem="no"
     print $ofh_AA qq/,,,,,,,,/;
     print $ofh_AA qq/,,,$storeCategoryName,$brand,$mpn,,/;
-    print $ofh_AA qq/,"$fullDescription",$unitCost,'ADDI',$stockLevel,$location,1,/;
+    print $ofh_AA qq/,"$fullDescription",$unitCost,$location,$stockLevel,$binRack,1,/;
     print $ofh_AA qq/admin,yes,no,$retailPrice,$supplier,/;
     print $ofh_AA qq/,,,,,/;
     print $ofh_AA qq/,,,,,taxable,/;
-    print $ofh_AA qq/6,4,4,$majorweight,$minorweight,$item_id,,,/;
+    print $ofh_AA qq/6,4,4,$majorweight,$minorweight,$item_id,,$SKU,/;
     print $ofh_AA qq/,,,$barcode,,,$brand,\n/;
 
     # Basic Product Import 
@@ -919,7 +960,7 @@ sub parse_description_html {
     if ( ! $html );
 
   $html = $html_filter->process( $html );
-  $html = decode_entities($html);
+  #$html = decode_entities($html);
 
   $listing->{DESCRIPTION} = $html;
 }
