@@ -66,3 +66,4 @@ fix_shipping/shipping_cost_fix.csv
 fix_shipping/shipping_cost_fix.errors.csv
 *.csv
 *.swo
+*.bak
