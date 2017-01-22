@@ -1,4 +1,5 @@
 # Specific Files
+*.bak
 shipping_cost_fix.csv
 shipping_cost_fix.errors.csv
 shipping_cost_fix.noweights.csv
@@ -6,9 +7,6 @@ shipping_cost_fix.noweights.csv
 cache/
 *.EPL2
 Endicia*/token.txt
-*~
-*~.*
-*.bak
 .gitignore
 
 # GVim swap files
