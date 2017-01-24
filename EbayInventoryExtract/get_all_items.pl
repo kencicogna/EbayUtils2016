@@ -689,13 +689,13 @@ for my $item_id ( reverse @all_items ) {
       # AgileIron Product Import
       print $ofh_AA qq/"$title",$item_id,$variationSKU,$parentSKU,$variationSKU,$barcode,"yes",/; # Matrix Item = Variation (i.e. "yes")
       print $ofh_AA qq/,,,,,,,,/;
-      print $ofh_AA qq/,$ebayVariationType,$variationSKU,$storeCategoryName,$brand,$mpn,,/;
+      print $ofh_AA qq/,$ebayVariationType,$variationSKU,$storeCategoryName,"$brand","$mpn",,/;
       print $ofh_AA qq/,"$fullDescription",$unitCost,$location,$stockLevel,$binRack,1,/;
-      print $ofh_AA qq/admin,yes,no,$retailPrice,$supplier,/;
+      print $ofh_AA qq/admin,yes,no,$retailPrice,"$supplier",/;
       print $ofh_AA qq/,,,,,/;
       print $ofh_AA qq/,,,,,taxable,/;
       print $ofh_AA qq/6,4,4,$majorweight,$minorweight,$item_id,"$variation",$variationSKU,/;
-      print $ofh_AA qq/,,,$barcode,,,$brand,\n/;
+      print $ofh_AA qq/,,,$barcode,,,"$brand",\n/;
 
       # Basic Product Import
       print $ofh_BPI qq/$variationSKU,"$varTitle",$purchasePrice,$retailPrice,$weight,$barcode,$primaryStoreCategoryName,"$shortDescription",$dimHeight,$dimDepth,$dimDepth\n/;
@@ -833,13 +833,13 @@ for my $item_id ( reverse @all_items ) {
     # AgileIron Product Import
     print $ofh_AA qq/"$title",$item_id,$SKU,,$SKU,$barcode,no,/; # MatrixItem="no"
     print $ofh_AA qq/,,,,,,,,/;
-    print $ofh_AA qq/,,,$storeCategoryName,$brand,$mpn,,/;
+    print $ofh_AA qq/,,,$storeCategoryName,"$brand","$mpn",,/;
     print $ofh_AA qq/,"$fullDescription",$unitCost,$location,$stockLevel,$binRack,1,/;
-    print $ofh_AA qq/admin,yes,no,$retailPrice,$supplier,/;
+    print $ofh_AA qq/admin,yes,no,$retailPrice,"$supplier",/;
     print $ofh_AA qq/,,,,,/;
     print $ofh_AA qq/,,,,,taxable,/;
     print $ofh_AA qq/6,4,4,$majorweight,$minorweight,$item_id,,$SKU,/;
-    print $ofh_AA qq/,,,$barcode,,,$brand,\n/;
+    print $ofh_AA qq/,,,$barcode,,,"$brand",\n/;
 
     # Basic Product Import 
     print $ofh_BPI qq/$SKU,"$title",$purchasePrice,$retailPrice,$weight,$barcode,$primaryStoreCategoryName,"$shortDescription",$dimHeight,$dimDepth,$dimDepth\n/;
