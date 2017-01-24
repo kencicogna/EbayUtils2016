@@ -995,7 +995,7 @@ sub submit_request {
   # Parse Response object to get Acknowledgement 
 	my $content =  $objResponse->content;
 	my $response_hash = XMLin( "$content",  
-      ForceArray=>['InternationalShippingServiceOption','ShippingServiceOptions','ShipToLocation','Variation','NameValueList', ] );
+      ForceArray=>['InternationalShippingServiceOption','ShippingServiceOptions','ShipToLocation','Variation','NameValueList','VariationSpecificPictureSet' ] );
 	#my $response_hash = XMLin( $content );
   my $ack = $response_hash->{Ack};
 
