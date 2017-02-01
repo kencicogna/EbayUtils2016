@@ -16,6 +16,7 @@ package MyFrame;
 use Wx qw[:everything];
 use base qw(Wx::Frame);
 use strict;
+use lib '../cfg';
 
 use Wx::Locale gettext => '_T';
 
@@ -40,10 +41,29 @@ getopts('u',\%opts);
 
 my $UPDATE_LOC = $opts{u} ? 1 : 0;
 
-chdir('C:/Users/Owner/Documents/revise_item/');	  # TTBSERVER
+my $host = `hostname`;
+chomp($host);
+our $ODBC;
+
+if ( $host eq "Ken-Laptop" ) {
+  chdir('C:/Users/Ken/Documents/');
+  $ODBC = 'BTData_DEV_SQLEXPRESS';
+}
+else {
+  chdir('C:/Users/Owner/Documents/revise_item/');
+  $ODBC = 'BTData_PROD_SQLEXPRESS';
+}
+
+if ( ! -d 'image' ) {
+    mkdir('image') or die "can't create 'image' directory";
+}
+
+if ( ! -d 'image/cache' ) {
+    mkdir('image/cache') or die "can't create image/cache' directory";
+}
+
 
 our $DEBUG            = 0;
-our $ODBC             = 'BTData_PROD_SQLEXPRESS';   # TTBSERVER
 our $PROD_ENVIRONMENT = 1;
 our $REFRESH = 1;
 our $PIC_LIMIT=7;     # Number of bitmap_buttons at the bottom of the screen (MINUS 1 for zero based index);
@@ -217,13 +237,6 @@ END_XML
 # END EBAY API INFO                                       #
 ###########################################################
 
-if ( ! -d 'image/cache' ) {
-    system('dir');
-    mkdir('image') or die "can't create 'image' directory";
-    mkdir('image/cache') or die "can't create image/cache' directory";
-}
-
-
 ####################################################################################################
 sub new {
 	my( $self, $parent, $id, $title, $pos, $size, $style, $name ) = @_;
@@ -342,63 +355,39 @@ Wx::Event::EVT_BUTTON($self, $self->{btn_clear_form}->GetId, \&btn_clear_form_on
   }
 
 	# SQL: Get list of items                                  # TODO: add postage fields?
-  $self->{sql}->{get_all_items} = 'select * from TTY_StorageLocation where active=1';
-
-  # SQL: Insert/Update Location/SKU info (in Blackthonre DB)
-#   $self->{sql}->{upsert_storage_location} = <<END_SQL;
-# MERGE TTY_StorageLocation t
-# USING (
-#   VALUES (?,?,?,?,?,?,?,?)
-# ) AS s (ebayitemid, manufacturer_sku, ttb_sku, location, title, variation, weight, supplier)
-# ON 
-#   t.title = s.title and
-# 	t.variation = s.variation
-# WHEN MATCHED THEN
-#   UPDATE SET 
-# 	     t.ebayitemid       = s.ebayitemid,
-#        t.manufacturer_sku = s.manufacturer_sku,
-# 	     t.ttb_sku          = s.ttb_sku,
-# 	     t.location         = UPPER(s.location),
-#        t.last_modified    = getdate(),
-# 			 t.weight           = s.weight,
-#        t.supplier         = s.supplier
-# WHEN NOT MATCHED THEN
-#   INSERT (ebayitemid, manufacturer_sku, ttb_sku, location, title, variation, last_modified, weight, supplier )
-#   VALUES (s.ebayitemid, s.manufacturer_sku, s.ttb_sku, UPPER(s.location), s.title, s.variation, getdate(), s.weight, s.supplier)
-# ;
-# END_SQL
+  $self->{sql}->{get_all_items} = 'select * from Inventory where active=1';
 
   # SQL: Insert/Update Location/SKU info -------> since we're using Linnworks, no need to update certain fields here because they won't be updated in LinnWorks
   #                                               NOTE: there shouldn't be any inserts because we have run this script with -u option to pre-load DB table
   $self->{sql}->{upsert_storage_location} = <<END_SQL;
-MERGE TTY_StorageLocation t
+MERGE Inventory t
 USING (
   VALUES (?,?,?,?,?,?,?,?)
-) AS s (ebayitemid, manufacturer_sku, ttb_sku, location, title, variation, weight, supplier)
+) AS s (ebayitemid, upc, sku, location, title, variation, weight, supplier)
 ON 
   t.title     = s.title     and
 	t.variation = s.variation
 WHEN MATCHED THEN
   UPDATE SET 
-        t.manufacturer_sku = s.manufacturer_sku,
+        t.upc = s.upc,
 	      t.location         = UPPER(s.location),
         t.last_modified    = getdate(),
 			  t.weight           = s.weight,
 				t.supplier         = s.supplier
 WHEN NOT MATCHED THEN
-  INSERT (ebayitemid, manufacturer_sku, ttb_sku, location, title, variation, last_modified, weight, supplier, active )
-  VALUES (s.ebayitemid, s.manufacturer_sku, s.ttb_sku, UPPER(s.location), s.title, s.variation, getdate(), s.weight, s.supplier, 1)
+  INSERT (ebayitemid, upc, sku, location, title, variation, last_modified, weight, supplier, active )
+  VALUES (s.ebayitemid, s.upc, s.sku, UPPER(s.location), s.title, s.variation, getdate(), s.weight, s.supplier, 1)
 ;
 END_SQL
 
   # SQL: Insert/Update location table when UPDATE_LOC (-u) switch is given
   #      This needs to be done to periodically to update the ebayItemID in particular
-  $self->{sql}->{clear_active_flag} = 'update TTY_StorageLocation set active=0';
+  $self->{sql}->{clear_active_flag} = 'update Inventory set active=0';
   $self->{sql}->{upsert_UPDATE_LOC} = <<END_SQL;
-MERGE INTO TTY_StorageLocation t
+MERGE INTO Inventory t
 USING (
   VALUES (?,?,?,?,?,?,?,?,?)
-) AS s (ebayitemid, supplier, ttb_sku, title, variation, image_url, main_image_url, manufacturer_sku,weight)
+) AS s (ebayitemid, supplier, sku, title, variation, image_url, main_image_url, upc,weight)
 ON 
   t.title     = s.title and
 	t.variation = s.variation
@@ -408,39 +397,39 @@ WHEN MATCHED THEN
 			 t.supplier         = isnull(s.supplier,t.supplier),
 	     t.variation        = s.variation,
 	     t.ebayitemid       = s.ebayitemid,
-	     t.ttb_sku          = s.ttb_sku,
+	     t.sku          = s.sku,
        t.last_modified    = getdate(),
        t.image_url        = s.image_url,
        t.main_image_url   = s.main_image_url,
        t.active           = 1,
-			 t.manufacturer_sku = isnull(s.manufacturer_sku,t.manufacturer_sku),
+			 t.upc = isnull(s.upc,t.upc),
 			 t.weight           = s.weight
 WHEN NOT MATCHED THEN
-  INSERT (ebayitemid, supplier, ttb_sku, title, variation, last_modified, image_url, main_image_url, active, manufacturer_sku, weight)
-  VALUES (s.ebayitemid, s.supplier, s.ttb_sku, s.title, s.variation, getdate(), s.image_url, s.main_image_url, 1, s.manufacturer_sku, s.weight)
+  INSERT (ebayitemid, supplier, sku, title, variation, last_modified, image_url, main_image_url, active, upc, weight)
+  VALUES (s.ebayitemid, s.supplier, s.sku, s.title, s.variation, getdate(), s.image_url, s.main_image_url, 1, s.upc, s.weight)
 ;
 END_SQL
 
   # SQL: Get SKU/Location record - Should return one record if there are no variations
   $self->{sql}->{get_storage_location_no_var} = <<END_SQL;
-select ebayitemid, manufacturer_sku, ttb_sku, location, title, variation, weight, supplier
-  from TTY_StorageLocation
+select ebayitemid, upc, sku, location, title, variation, weight, supplier
+  from Inventory
  where title = ?
    and (variation is null or variation = '')
 END_SQL
 
   # SQL: Get SKU/Location record - Should return one record for the given variation
   $self->{sql}->{get_storage_location_var} = <<END_SQL;
-select ebayitemid, manufacturer_sku, ttb_sku, location, title, variation, weight, supplier
-  from TTY_StorageLocation
+select ebayitemid, upc, sku, location, title, variation, weight, supplier
+  from Inventory
  where title = ?
    and variation = ?
 END_SQL
 
 	# SQL: Get next SKU
 	$self->{sql}->{get_next_sku} = <<END_SQL;
-select max( substring(ttb_sku,4,6) ) + 1 as next_sku
-  from TTY_StorageLocation
+select max( substring(sku,4,6) ) + 1 as next_sku
+  from Inventory
 END_SQL
 
 
@@ -521,7 +510,7 @@ sub __load_items {
     print "\n\nFound $all_item_cnt items! \n\n";
 
     ####################################################################################################
-    # UPDATE TTY_STORAGELOCATION TABLE   (eBayItemID, ImageURL, active flag, etc)
+    # UPDATE Inventory TABLE   (eBayItemID, ImageURL, active flag, etc)
     my $itemcnt=0;
 
 #TODO: ADD LINE BACK IN!  COMMENTED OUT FOR TESTING.
@@ -530,7 +519,7 @@ sub __load_items {
 		my $sql = $self->{sql}->{upsert_UPDATE_LOC};
 		my $sth = $self->{dbh}->prepare( $sql ) or die "can't prepare stmt: $sql";
 
-    # Only run this to update/fix the tty_storagelocation table (i.e. to make sure eBayItemID is current)
+    # Only run this to update/fix the Inventory table (i.e. to make sure eBayItemID is current)
     for my $item_id ( uniq sort @all_items ) {
 
 #TODO: COMMENT OUT THIS LINE. UNCOMMENTED FOR TESTING.
@@ -625,26 +614,26 @@ sub __load_items {
 
         # Update location table
         for my $variation ( keys %$img_map ) {
-          my $ttb_sku   = $sku_map->{$variation};
+          my $sku   = $sku_map->{$variation};
           my $image_url = $img_map->{$variation};
 					my $upc       = $upc_map->{$variation};
-          $sth->execute($item_id, $brand, $ttb_sku, $title, $variation, $image_url, $image_url_main,$upc,$weight_oz) or die "can't execute query: $sql";
+          $sth->execute($item_id, $brand, $sku, $title, $variation, $image_url, $image_url_main,$upc,$weight_oz) or die "can't execute query: $sql";
         }
       }
       else {
         # Non-variation listing
         my $variation = '';
         my $image_url = $image_url_main;
-        my $ttb_sku   = $r->{SKU};
+        my $sku   = $r->{SKU};
         my $upc       = get_UPC($r->{ItemSpecifics});
 			  
-        $sth->execute($item_id, $brand, $ttb_sku, $title, $variation, $image_url, $image_url_main, $upc,$weight_oz) or die "can't execute query: $sql";
+        $sth->execute($item_id, $brand, $sku, $title, $variation, $image_url, $image_url_main, $upc,$weight_oz) or die "can't execute query: $sql";
       }
 
     } # End for @all_items loop
   } # End if UPDATE_LOC
 
-  # build the lookup tables using a select from the tty_storagelocation table
+  # build the lookup tables using a select from the Inventory table
   my $sth = $self->{dbh}->prepare( $self->{sql}->{get_all_items} ) or die "can't prepare stmt";
   $sth->execute() or die "can't execute query";
 
@@ -653,7 +642,7 @@ sub __load_items {
 
   while ( my $r = $sth->fetchrow_hashref ) {
     my $title = $r->{title};  
-    my $upc   = defined $r->{manufacturer_sku} ? $r->{manufacturer_sku} : '';
+    my $upc   = defined $r->{upc} ? $r->{upc} : '';
     my $variation_name = defined $r->{variation} ? $r->{variation} : '';
 
     $st->{ $r->{title} }->{itemid}         = $r->{ebayitemid};
@@ -1040,7 +1029,7 @@ DATA
 		if ( $verification_ok ) {
       my $splash = $self->updating_dialog();
 
-			# Update info on database (tty_storagelocation table)
+			# Update info on database (Inventory table)
 		  $sth->execute($ItemID, $SKU, $TTB_SKU, $Location, $Title, $Variation, $Weight,$Supplier) or die "can't execute query";
 
 		  # Submit Revise Item request
@@ -1150,7 +1139,7 @@ sub getCurrentItemInfo() {
   $self->{objHeader} = $self->{objHeaderGetItem};
 	my $response_hash  = $self->submit_request();
 
-	my $ttb_sku   = $response_hash->{Item}->{SKU};  # Note: the TTB SKU is inserted into the "real" SKU field on ebay.
+	my $sku   = $response_hash->{Item}->{SKU};  # Note: the TTB SKU is inserted into the "real" SKU field on ebay.
 	my $upc       = get_UPC($response_hash->{Item}->{ItemSpecifics});  # UPC / Manufacturer SKU
 	my $gross_qty = $response_hash->{Item}->{Quantity};
 	my $sold_qty  = $response_hash->{Item}->{SellingStatus}->{QuantitySold};
@@ -1159,8 +1148,8 @@ sub getCurrentItemInfo() {
 	$self->{is_map}->{$ItemID} = $response_hash->{Item}->{ItemSpecifics};
 
 	$self->{lbl_quantity_available}->SetLabel( $avail_qty );
-	if ($ttb_sku) {
-	  $self->{tc_ttb_sku}->SetValue( $ttb_sku ) 
+	if ($sku) {
+	  $self->{tc_ttb_sku}->SetValue( $sku ) 
 	}
 
 	# Check to see if this item is already in the Storage Location table
@@ -1181,15 +1170,15 @@ sub getCurrentItemInfo() {
     #       $ttb_sku         is the value stored on EBAY
 
 		# verify Storage Location / SKU table info VS. eBay info     
-		if ( $item->{ttb_sku} && $ttb_sku eq '' ) {
+		if ( $item->{sku} && $sku eq '' ) {
 			  #TODO: commented this line out temporarily. Seems like there are a LOT of items that now have a different item number,
         #      therefore, they have lost their sku on eBay.
-        #$self->warning_dialog("This product has a SKU of '$item->{ttb_sku}' in the database, BUT it is NOT set on Ebay");
+        #$self->warning_dialog("This product has a SKU of '$item->{sku}' in the database, BUT it is NOT set on Ebay");
 	      print STDERR "\nItem (Database): ", Dumper($item);
 		}
 		
-		$self->{tc_product_sku}->SetValue( $upc || $item->{manufacturer_sku} );	
-		$self->{tc_ttb_sku}->SetValue    ( $item->{ttb_sku} );	
+		$self->{tc_product_sku}->SetValue( $upc || $item->{upc} );	
+		$self->{tc_ttb_sku}->SetValue    ( $item->{sku} );	
 		$self->{tc_location}->SetValue   ( $item->{location} );	
 		$self->{tc_weight}->SetValue       ( $item->{weight} );	
 		print "\nSUPPLIER: '$item->{supplier}'";
@@ -1197,11 +1186,11 @@ sub getCurrentItemInfo() {
 		$self->{current_supplier}=$item->{supplier};
 
 		# Set Focus
-		if ( ! $upc and ! $item->{manufacturer_sku} ) {
+		if ( ! $upc and ! $item->{upc} ) {
 			$self->{tc_product_sku}->SetFocus();
 			$self->{tc_product_sku}->SetSelection(-1,-1);
 		}
-		elsif ( ! $item->{ttb_sku} ) {
+		elsif ( ! $item->{sku} ) {
 			$self->{tc_ttb_sku}->SetFocus();
 			$self->{tc_ttb_sku}->SetSelection(-1,-1);
 		}
@@ -1276,7 +1265,7 @@ sub getCurrentItemVariationInfo() {
   delete( $self->{current_variation_specifics}->{SellingStatus} );
   $self->{current_variation_specifics}->{StartPrice} = $self->{current_variation_specifics}->{StartPrice}->{content};
 
-	my $ttb_sku   = $variations->{$var}->{SKU};
+	my $sku   = $variations->{$var}->{SKU};
 	my $upc       = $variations->{$var}->{UPC};
 	my $avail_qty = $variations->{$var}->{availableQuantity};
 
@@ -1286,8 +1275,8 @@ sub getCurrentItemVariationInfo() {
   #
   #  With Linnworks it MUST be correct on eBay, so it's safe to update the table with the eBay value.
   #
-	if ($ttb_sku) {
-	  $self->{tc_ttb_sku}->SetValue( $ttb_sku ) 
+	if ($sku) {
+	  $self->{tc_ttb_sku}->SetValue( $sku ) 
 	}
 
 	# Check to see if this item is already in the Storage Location table
@@ -1300,12 +1289,12 @@ sub getCurrentItemVariationInfo() {
 
 	my $hr_result = $sth->fetchall_hashref('title');   #NOTE: changed from ebayitemid to title
 	if ( scalar(keys %$hr_result) == 1) {
- 	  my $itemvar = $hr_result->{$title};			# NOTE:  ItemID is from eBay, however this can differ from what's in TTY_StorageLocation table
+ 	  my $itemvar = $hr_result->{$title};			# NOTE:  ItemID is from eBay, however this can differ from what's in Inventory table
                                             #        The SOLUTION is to run this program with the -u option to get current ebayItemID.
     $itemvar->{ebayitemid}=$ItemID;
 
-		$self->{tc_product_sku}->SetValue( $upc || $itemvar->{manufacturer_sku} );	
-		$self->{tc_ttb_sku}->SetValue    ( $itemvar->{ttb_sku} );	
+		$self->{tc_product_sku}->SetValue( $upc || $itemvar->{upc} );	
+		$self->{tc_ttb_sku}->SetValue    ( $itemvar->{sku} );	
 		$self->{tc_location}->SetValue   ( $itemvar->{location} );	
 		$self->{tc_weight}->SetValue       ( $itemvar->{weight} || '0');	
 		$self->{ch_supplier}->SetSelection( $all_suppliers_idx{ $itemvar->{supplier} } );
@@ -1341,7 +1330,7 @@ sub evt_tc_search_Text_Enter {
     $self->{tc_title}->SetValue         ( $title );      
     $self->{tc_item_id}->SetValue       ( $i->{itemid} );
     $self->{tc_ttb_sku}->SetValue       ( '' );
-    $self->{tc_product_sku}->SetValue   ( '' );  # Can be overwritten later if item exists in tty_storagelocation table
+    $self->{tc_product_sku}->SetValue   ( '' );  # Can be overwritten later if item exists in Inventory table
     $self->{tc_quantity_add}->SetValue  ( '' );
     $self->{tc_quantity_total}->SetValue( '' );
     $self->{lbl_quantity_available}->SetLabel( '' );
@@ -1575,16 +1564,16 @@ sub evt_ch_variation_choice {
 		my $hr_result = $sth->fetchall_hashref('ebayitemid');
 		if ( scalar(keys %$hr_result) ) { 
 			my $item = $hr_result->{$ItemID};
-			$self->{tc_product_sku}->SetValue( $upc || $item->{manufacturer_sku} );	
-			$self->{tc_ttb_sku}->SetValue    ( $item->{ttb_sku} );	
+			$self->{tc_product_sku}->SetValue( $upc || $item->{upc} );	
+			$self->{tc_ttb_sku}->SetValue    ( $item->{sku} );	
 			$self->{tc_location}->SetValue   ( $item->{location} );	
 
 			# Set Focus
-			if ( ! $upc and ! $item->{manufacturer_sku} ) {
+			if ( ! $upc and ! $item->{upc} ) {
 			  $self->{tc_product_sku}->SetFocus();
 			  $self->{tc_product_sku}->SetSelection(-1,-1);
 			}
-			elsif ( ! $item->{ttb_sku} ) {
+			elsif ( ! $item->{sku} ) {
 			  $self->{tc_ttb_sku}->SetFocus();
 			  $self->{tc_ttb_sku}->SetSelection(-1,-1);
 			}
@@ -1621,7 +1610,7 @@ sub evt_tc_product_sku_text_enter {
 # end wxGlade
   my $title          = $self->{current_title};
   my $variation      = $self->{current_variation};
-  my $ttb_sku_prefix = 'TTB';
+  my $ttb_sku_prefix = 'AA';
 
 	# select next sku => max(sku)+1
 	my $sql = $self->{sql}->{get_next_sku};
