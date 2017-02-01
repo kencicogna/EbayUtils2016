@@ -22,7 +22,6 @@ my %opts;
 getopts('i:aDI:O:p',\%opts);
 # -i <ebay item ID>		- perform operations on this single item
 # -a                  - perform operations on all items
-# -r 									- revise item(s)
 # -D                  - Debug/verbose mode. 
 # -I <filename>       - Input filename. csv format (same as output. PUT NEW VALUE IN THE "TOTAL SHIPPING COST" column)
 # -O <filename>       - output filename base. default is 'product_import'
@@ -45,8 +44,12 @@ my $DEBUG       = defined $opts{D} ? 1 : 0;
 my $infile      = defined $opts{I} ? $opts{I} : '';
 my $outfile     = defined $opts{O} ? $opts{O} : 'lw_import';
 
+print "\n\nDEV Mode. Use -p option for Production!\n\n" if ( ! $PRODUCTION );
+
 my $of_ERR = $outfile . '.error_log.csv';
-my $of_AA  = $outfile . '.aa_product_import.csv';           # AA - AgileIron
+my $of_AI  = $outfile . '.AI_basic_product_import.csv';    # AI - AgileIron - Basic Item
+my $of_AIM = $outfile . '.AI_matrix_product_import.csv';   # AI - AgileIron - Item with Variations
+my $of_AIIS= $outfile . '.AI_item_specifics_import.csv';    # AI - AgileIron - Item Specifics (all items)
 my $of_BPI = $outfile . '.basic_product.csv';
 my $of_SLI = $outfile . '.stock_level.csv';
 my $of_ATT = $outfile . '.product_ext_propeties.csv';
@@ -141,7 +144,9 @@ my $sqlGetProductInfoBySKU = 'select * from Inventory where SKU=?';
 
 # Open output files
 open my $ofh_ERR, '>', $of_ERR or die "can't open file $of_ERR";
-open my $ofh_AA , '>', $of_AA  or die "can't open file $of_AA ";
+open my $ofh_AI , '>', $of_AI  or die "can't open file $of_AI ";
+open my $ofh_AIIS,'>', $of_AIIS or die "can't open file $of_AIIS";
+open my $ofh_AIM, '>', $of_AIM or die "can't open file $of_AIM";
 open my $ofh_BPI, '>', $of_BPI or die "can't open file $of_BPI";
 open my $ofh_SLI, '>', $of_SLI or die "can't open file $of_SLI";
 open my $ofh_ATT, '>', $of_ATT or die "can't open file $of_ATT";
@@ -180,6 +185,9 @@ my $sth_productInfo = $dbh->prepare( $sqlGetProductInfoBySKU ) or die "can't pre
 
 my $request;
 my $response_hash;
+my $allEbayCategories = {};
+my $allItemSpecifics = {};
+my $allItemsItemSpecifics = {};
 
 ################################################################################
 # Get list of all item id's
@@ -275,7 +283,9 @@ my $all_items_count = scalar @all_items;
 
 
 # Print Headers records to output files
-print $ofh_AA  qq/"Product Name","ItemID","Custom Label","RelationshipDetails","Product Code","Bar Code","Matrix Item","Color Style","Pacifier Style","Stickers","Scent Model","Animal","Dinosaur","Theme","Air Freshener Type","Pacifier Animal","Type","Matrix SKU Code","Product Category","Manufacturer","Manufacturer Part No","Website","Product Images","Description","Unit Cost","Stock Location","Qty in Stock","Bin Location","Reorder Level","Product Stock Manager","Send Stock Notifications","Auto Create PO at Reorder Level","eBay PriceBook","Preferred Vendor","Preferred Vendor Part Number","Preferred Vendor Price","Preferred Vendor Order Qty","SEO Title","SEO Description","SEO Keywords","Income Account","COGS Account","Asset Account","QuickBooks Item","Tax Category","Length (in)","Width (in)","Height (in)","Weight-Major (lbs)","Weight-Minor (oz)","eBay Item ID","eBay Variation","SKU","ASIN","FNSKU","Discontinued","UPC Code","ISBN","EAN","Brand","EPID"\n/;
+my $AI_headers = qq/"Product Name","ItemID","Custom Label","RelationshipDetails","Product Code","Bar Code","Matrix Item","Variation Type","Matrix SKU Code","Product Category","Manufacturer","Manufacturer Part No","Website","Product Images","Description","Unit Cost","Stock Location","Qty in Stock","Bin Location","Reorder Level","Product Stock Manager","Send Stock Notifications","Auto Create PO at Reorder Level","eBay PriceBook","Preferred Vendor","Preferred Vendor Part Number","Preferred Vendor Price","Preferred Vendor Order Qty","SEO Title","SEO Description","SEO Keywords","Income Account","COGS Account","Asset Account","QuickBooks Item","Tax Category","Length (in)","Width (in)","Height (in)","Weight-Major (lbs)","Weight-Minor (oz)","eBay Item ID","eBay Variation","SKU","ASIN","FNSKU","Discontinued","UPC Code","ISBN","EAN","Brand","EPID","EbayCategoryID","EbayCategoryName"\n/;
+print $ofh_AI  $AI_headers;
+print $ofh_AIM $AI_headers;
 print $ofh_BPI qq/SKU,Title,PurchasePrice,RetailPrice,Weight,BarcodeNumber,Category,ShortDescription,DimHeight,DimWidth,DimDepth\n/;
 print $ofh_SLI qq/SKU,StockLevel,MinimumLevel,UnitCost,StockValue,Location,BinRack\n/;
 print $ofh_ATT qq/SKU,PropertyType,PropertyName,PropertyValue\n/;
@@ -468,7 +478,8 @@ for my $item_id ( reverse @all_items ) {
   $item_count++;
 
   # Get Category info
-  my $ebayCategory = $ebayListing->{PrimaryCategory}->{CategoryID};                              # Ebay category ID (primary)
+  my $ebayCategoryID = $ebayListing->{PrimaryCategory}->{CategoryID};                              # Ebay category ID (primary)
+  my $ebayCategoryName = $ebayListing->{PrimaryCategory}->{CategoryName};                              # Ebay category ID (primary)
   my ($primaryStoreCategoryID,$secondaryStoreCategoryID)  = GetCategoryID($ebayListing);         # Get store category ID's
   my $primaryStoreCategoryName = $categoryIDHash->{$primaryStoreCategoryID};                     # Store category (primary)
   my $secondaryStoreCategoryName = $categoryIDHash->{$secondaryStoreCategoryID};                 # Store category (secondary)
@@ -623,7 +634,6 @@ for my $item_id ( reverse @all_items ) {
       # Variation Parent
       #
       if ( $writeParentSKU ) {
-
         # Parent SKU record ( replaces "variationGroup" column in "Basic Product Import" )
         print $ofh_VG qq/$parentSKU,$variationGroup\n/; # parentSKU = parentSKU
 
@@ -649,13 +659,15 @@ for my $item_id ( reverse @all_items ) {
         print $ofh_ATT qq/$parentSKU,Attribute,IntlShipProfID,"$IntlShipProfID"\n/   if (defined $IntlShipProfID);   
 
         # Categories
-        print $ofh_ATT qq/$parentSKU,Attribute,PrimaryEbayCategory,"$ebayCategory"\n/;
+        print $ofh_ATT qq/$parentSKU,Attribute,PrimaryEbayCategory,"$ebayCategoryID"\n/;
 
         # Item Specifics
         for my $attrName ( sort keys %$itemSpecificsHash ) {
           my $attrValue = $itemSpecificsHash->{$attrName};
           $attrValue =~ s/"/""/g; # fix excel/csv printing issue
-          $attrValue =~ s/&/and/g;
+          #$attrValue =~ s/&/and/g;
+          $allItemSpecifics->{$attrName} = 1; 
+          $allItemsItemSpecifics->{$parentSKU}->{$attrName} = $attrValue;
           print $ofh_ATT qq/$parentSKU,Specification,$attrName,"$attrValue"\n/;
         }
 
@@ -674,28 +686,28 @@ for my $item_id ( reverse @all_items ) {
       $title =~ s/"/""/g;
       $variation =~ s/"/""/g;
 
-      # RelationshipDetails - Puting in parent SKU for now?
-      
 #       "Product Name","ItemID","Custom Label","RelationshipDetails","Product Code","Bar Code","Matrix Item"
-#       "Color Style","Pacifier Style","Stickers","Scent Model","Animal","Dinosaur","Theme","Air Freshener Type"
-#       "Pacifier Animal","Type","Matrix SKU Code","Product Category","Manufacturer","Manufacturer Part No","Website"
+#       "Variation Type","Matrix SKU Code","Product Category","Manufacturer","Manufacturer Part No","Website"
 #       "Product Images","Description","Unit Cost","Stock Location","Qty in Stock","Bin Location","Reorder Level"
 #       "Product Stock Manager","Send Stock Notifications","Auto Create PO at Reorder Level","eBay PriceBook","Preferred Vendor"
+#
 #       "Preferred Vendor Part Number","Preferred Vendor Price","Preferred Vendor Order Qty","SEO Title","SEO Description"
 #       "SEO Keywords","Income Account","COGS Account","Asset Account","QuickBooks Item","Tax Category"
 #       "Length (in)","Width (in)","Height (in)","Weight-Major (lbs)","Weight-Minor (oz)","eBay Item ID","eBay Variation","SKU"
 #       "ASIN","FNSKU","Discontinued","UPC Code","ISBN","EAN","Brand","EPID"
+#       "EbayCategoryID","EbayCategoryName"
 
       # AgileIron Product Import
-      print $ofh_AA qq/"$title",$item_id,$variationSKU,$parentSKU,$variationSKU,$barcode,"yes",/; # Matrix Item = Variation (i.e. "yes")
-      print $ofh_AA qq/,,,,,,,,/;
-      print $ofh_AA qq/,$ebayVariationType,$variationSKU,$storeCategoryName,"$brand","$mpn",,/;
-      print $ofh_AA qq/,"$fullDescription",$unitCost,$location,$stockLevel,$binRack,1,/;
-      print $ofh_AA qq/admin,yes,no,$retailPrice,"$supplier",/;
-      print $ofh_AA qq/,,,,,/;
-      print $ofh_AA qq/,,,,,taxable,/;
-      print $ofh_AA qq/6,4,4,$majorweight,$minorweight,$item_id,"$variation",$variationSKU,/;
-      print $ofh_AA qq/,,,$barcode,,,"$brand",\n/;
+      print $ofh_AIM qq/"$title",$item_id,$variationSKU,,$parentSKU,$barcode,"yes",/; # Matrix Item = Variation (i.e. "yes")
+      print $ofh_AIM qq/$ebayVariationType,$variationSKU,"$storeCategoryName","$brand","$mpn",,/;
+      print $ofh_AIM qq/,"$fullDescription",$unitCost,$location,$stockLevel,$binRack,1,/;
+      print $ofh_AIM qq/admin,yes,no,$retailPrice,"$supplier",/; # TODO: Supplier can differ from manufacturer (brand) 
+      print $ofh_AIM qq/,,,,,/; 
+      print $ofh_AIM qq/,,,,,taxable,/;
+      print $ofh_AIM qq/6,4,4,$majorweight,$minorweight,$item_id,"$variation",$variationSKU,/;
+      print $ofh_AIM qq/,,,$barcode,,,"$brand",/;
+      print $ofh_AIM qq/$ebayCategoryID,$ebayCategoryName/;
+      print $ofh_AIM "\n";
 
       # Basic Product Import
       print $ofh_BPI qq/$variationSKU,"$varTitle",$purchasePrice,$retailPrice,$weight,$barcode,$primaryStoreCategoryName,"$shortDescription",$dimHeight,$dimDepth,$dimDepth\n/;
@@ -718,7 +730,8 @@ for my $item_id ( reverse @all_items ) {
       print $ofh_ATT qq/$variationSKU,Attribute,IntlShipProfID,"$IntlShipProfID"\n/   if (defined $IntlShipProfID);   
 
       # Categories
-      print $ofh_ATT qq/$variationSKU,Attribute,PrimaryEbayCategory,"$ebayCategory"\n/;
+      print $ofh_ATT qq/$variationSKU,Attribute,PrimaryEbayCategory,"$ebayCategoryID"\n/;
+      $allEbayCategories->{$ebayCategoryID} = $ebayCategoryName;
 
       # Item Specifics
       for my $attrName ( sort keys %$itemSpecificsHash ) {
@@ -820,7 +833,7 @@ for my $item_id ( reverse @all_items ) {
 
     no warnings;
 #     $title            =~ s/"/''/g;
-#     $shortDescription =~ s/"/''/g;
+#     $shortDescription =~ s/"/''/gt
 #     $fullDescription  =~ s/"/''/g; 
     $purchasePrice    = sprintf("%0.2f",$purchasePrice);
     $retailPrice      = sprintf("%0.2f",$retailPrice  );
@@ -831,15 +844,16 @@ for my $item_id ( reverse @all_items ) {
     if ( ! $imageurl )        { print $ofh_ERR "\nERROR: Cannot determine PRIMARY Image!!!      TITLE: '$title' VAR: '$variation'\n"; }
 
     # AgileIron Product Import
-    print $ofh_AA qq/"$title",$item_id,$SKU,,$SKU,$barcode,no,/; # MatrixItem="no"
-    print $ofh_AA qq/,,,,,,,,/;
-    print $ofh_AA qq/,,,$storeCategoryName,"$brand","$mpn",,/;
-    print $ofh_AA qq/,"$fullDescription",$unitCost,$location,$stockLevel,$binRack,1,/;
-    print $ofh_AA qq/admin,yes,no,$retailPrice,"$supplier",/;
-    print $ofh_AA qq/,,,,,/;
-    print $ofh_AA qq/,,,,,taxable,/;
-    print $ofh_AA qq/6,4,4,$majorweight,$minorweight,$item_id,,$SKU,/;
-    print $ofh_AA qq/,,,$barcode,,,"$brand",\n/;
+    print $ofh_AI qq/"$title",$item_id,$SKU,,$SKU,$barcode,no,/; # MatrixItem="no"
+    print $ofh_AI qq/,,"$storeCategoryName","$brand","$mpn",,/;
+    print $ofh_AI qq/,"$fullDescription",$unitCost,$location,$stockLevel,$binRack,1,/;
+    print $ofh_AI qq/admin,yes,no,$retailPrice,"$supplier",/; # TODO: Supplier can differ from manufacturer (brand) 
+    print $ofh_AI qq/,,,,,/;
+    print $ofh_AI qq/,,,,,taxable,/;
+    print $ofh_AI qq/6,4,4,$majorweight,$minorweight,$item_id,,$SKU,/;
+    print $ofh_AI qq/,,,$barcode,,,"$brand",/;
+    print $ofh_AI qq/$ebayCategoryID,$ebayCategoryName/;
+    print $ofh_AI "\n";
 
     # Basic Product Import 
     print $ofh_BPI qq/$SKU,"$title",$purchasePrice,$retailPrice,$weight,$barcode,$primaryStoreCategoryName,"$shortDescription",$dimHeight,$dimDepth,$dimDepth\n/;
@@ -861,13 +875,16 @@ for my $item_id ( reverse @all_items ) {
     print $ofh_ATT qq/$SKU,Attribute,IntlShipProfID,"$IntlShipProfID"\n/   if (defined $IntlShipProfID);   
 
     # eBay categories
-    print $ofh_ATT qq/$SKU,Attribute,PrimaryEbayCategory,"$ebayCategory"\n/;
+    print $ofh_ATT qq/$SKU,Attribute,PrimaryEbayCategory,"$ebayCategoryID"\n/;
+    $allEbayCategories->{$ebayCategoryID} = $ebayCategoryName;
 
     # Item Specifics
     for my $attrName ( sort keys %$itemSpecificsHash ) {
       my $attrValue = $itemSpecificsHash->{$attrName};
       $attrValue =~ s/"/''/g;
-      $attrValue =~ s/&/and/g;
+      #$attrValue =~ s/&/and/g;
+      $allItemSpecifics->{$attrName} = 1; 
+      $allItemsItemSpecifics->{$SKU}->{$attrName} = $attrValue;
       print $ofh_ATT qq/$SKU,Specification,$attrName,"$attrValue"\n/;
     }
 
@@ -892,6 +909,8 @@ for my $item_id ( reverse @all_items ) {
   # exit if ( $rec_count > 20 );
 }
 
+close $ofh_AI;
+close $ofh_AIM;
 close $ofh_BPI;
 close $ofh_SLI;
 close $ofh_ATT;
@@ -899,6 +918,40 @@ close $ofh_SUP;
 close $ofh_IMG;
 close $ofh_DES;
 close $ofh_ERR;
+
+# TODO: Maybe we do this later...
+# Get Ebay Category name and Item Specifics 
+# for my $categoryID ( keys $allEbayCategories ) {
+    # Make API call to get recommended item specifics
+# }
+
+#
+# All Current Item specifics for each Item
+#
+my @ispecs = ('SKU', sort keys %$allItemSpecifics);
+my $ispec_headers = join( ',', @ispecs );
+print $ofh_AIIS "$ispec_headers\n";
+
+my %iso;
+my $ispos = 0;
+for my $is ( @ispecs ) {
+  $iso{$is} = $ispos++; 
+}
+
+for my $sku ( keys %$allItemsItemSpecifics ) {
+  my @isvalues = ();
+  $isvalues[0] = $sku;
+  while( my ($isname,$isvalue) = each %{$allItemsItemSpecifics->{$sku}} ) {
+    if ( ! defined( $iso{$isname} ) ) {
+      print "ERROR: SKU=$sku  ISNAME=$isname\n";
+      next;
+    }
+    my $pos = $iso{$isname}; 
+    $isvalues[$pos] = qq/"$isvalue"/;
+  }
+  print $ofh_AIIS join(',',@isvalues),"\n"; 
+}
+close $ofh_AIIS;
 
 
 print <<END;
