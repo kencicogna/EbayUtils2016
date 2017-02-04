@@ -149,9 +149,6 @@ for ( my $i=0; $i<@all_suppliers; $i++ ) {
 # EBAY API INFO                                   #
 ###################################################
 
-# $objHeader->push_header('X-EBAY-API-CALL-NAME' => 'ReviseFixedPriceItem');
-# $objHeaderGetItem->push_header('X-EBAY-API-CALL-NAME' => 'GetItem');
-
 # Ebay API Request Headers
 our $header = $EbayConfig::ES_http_header;
 
@@ -334,8 +331,6 @@ Wx::Event::EVT_BUTTON($self, $self->{btn_clear_form}->GetId, \&btn_clear_form_on
   # USER DEFINED VARIABLES                                  #
   ###########################################################
   $self->{objHeader}           = $header;
-  $self->{objHeaderReviseItem} = $header;
-  $self->{objHeaderGetItem}    = $header;
 
   $self->{request_reviseitem_default} = $request_reviseitem_default;
   $self->{request_getitem_default}    = $request_getitem_default;
@@ -986,8 +981,9 @@ sub btn_submit_onClick {
     }
   }
 
-  $self->{request}   = $request;
-  $self->{objHeader} = $self->{objHeaderReviseItem};
+  $self->{request} = $request;
+  $self->{objHeader}->remove_header('X-EBAY-API-CALL-NAME');
+  $self->{objHeader}->push_header  ('X-EBAY-API-CALL-NAME'=>'ReviseItem' );
 
 #  print Dumper($request);
 
@@ -1136,7 +1132,8 @@ sub getCurrentItemInfo() {
 	# Get Item info from eBay
 	$request =~ s/__ItemID__/$ItemID/;
 	$self->{request}   = $request;
-  $self->{objHeader} = $self->{objHeaderGetItem};
+  $self->{objHeader}->remove_header('X-EBAY-API-CALL-NAME');
+  $self->{objHeader}->push_header  ('X-EBAY-API-CALL-NAME'=>'GetItem' );
 	my $response_hash  = $self->submit_request();
 
 	my $sku   = $response_hash->{Item}->{SKU};  # Note: the TTB SKU is inserted into the "real" SKU field on ebay.
@@ -1223,7 +1220,8 @@ sub getCurrentItemVariationInfo() {
 	$request =~ s/__ItemID__/$ItemID/;
 
 	$self->{request}   = $request;
-  $self->{objHeader} = $self->{objHeaderGetItem};
+  $self->{objHeader}->remove_header('X-EBAY-API-CALL-NAME');
+  $self->{objHeader}->push_header  ('X-EBAY-API-CALL-NAME'=>'GetItem' );
 
 	# Show "loading" splash screen
   my $splash = $self->loading_dialog();
