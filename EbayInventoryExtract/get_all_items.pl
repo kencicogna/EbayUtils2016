@@ -483,7 +483,7 @@ for my $item_id ( reverse @all_items ) {
   my ($primaryStoreCategoryID,$secondaryStoreCategoryID)  = GetCategoryID($ebayListing);         # Get store category ID's
   my $primaryStoreCategoryName = $categoryIDHash->{$primaryStoreCategoryID};                     # Store category (primary)
   my $secondaryStoreCategoryName = $categoryIDHash->{$secondaryStoreCategoryID};                 # Store category (secondary)
-  my $storeCategoryName = $secondaryStoreCategoryName ? "$primaryStoreCategoryName::$secondaryStoreCategoryName" : $primaryStoreCategoryName;
+  my $storeCategoryName = $secondaryStoreCategoryName ? "${primaryStoreCategoryName}::${secondaryStoreCategoryName}" : $primaryStoreCategoryName;
 
   my $brand = $itemSpecificsHash->{Brand} ? $itemSpecificsHash->{Brand} : "";
   my $mpn   = $itemSpecificsHash->{MPN} ? $itemSpecificsHash->{MPN} : "";
@@ -706,7 +706,7 @@ for my $item_id ( reverse @all_items ) {
       print $ofh_AIM qq/,,,,,taxable,/;
       print $ofh_AIM qq/6,4,4,$majorweight,$minorweight,$item_id,"$variation",$variationSKU,/;
       print $ofh_AIM qq/,,,$barcode,,,"$brand",/;
-      print $ofh_AIM qq/$ebayCategoryID,$ebayCategoryName/;
+      print $ofh_AIM qq/,$ebayCategoryID,"$ebayCategoryName"/;
       print $ofh_AIM "\n";
 
       # Basic Product Import
@@ -852,7 +852,7 @@ for my $item_id ( reverse @all_items ) {
     print $ofh_AI qq/,,,,,taxable,/;
     print $ofh_AI qq/6,4,4,$majorweight,$minorweight,$item_id,,$SKU,/;
     print $ofh_AI qq/,,,$barcode,,,"$brand",/;
-    print $ofh_AI qq/$ebayCategoryID,$ebayCategoryName/;
+    print $ofh_AI qq/,$ebayCategoryID,"$ebayCategoryName"/;
     print $ofh_AI "\n";
 
     # Basic Product Import 
@@ -906,7 +906,7 @@ for my $item_id ( reverse @all_items ) {
     use warnings;
     #print "\n",$rec_count++;
   }
-  # exit if ( $rec_count > 20 );
+  #exit if ( $rec_count > 20 );
 }
 
 close $ofh_AI;
@@ -947,6 +947,7 @@ for my $sku ( keys %$allItemsItemSpecifics ) {
       next;
     }
     my $pos = $iso{$isname}; 
+    $isvalue =~ s/"/""/g;
     $isvalues[$pos] = qq/"$isvalue"/;
   }
   print $ofh_AIIS join(',',@isvalues),"\n"; 
@@ -995,7 +996,7 @@ sub LoadCategory {
     }
 
     for my $hr_scat ( @{$hr_cat->{ChildCategory}} ) {
-      my $childname  = "$fullname::" . $hr_scat->{Name};
+      my $childname  = "${fullname}::" . $hr_scat->{Name};
       LoadCategory( $hr_scat, $childname );
     }
   }
