@@ -806,8 +806,8 @@ for my $item_id ( reverse @all_items ) {
     my $pic3     = $ebayListing->{IMAGE3};
 
     # UPC Validation
-    if ( ($itemSpecificsHash->{UPC} && $slt->{upc}) && 
-         ($itemSpecificsHash->{UPC} ne $slt->{upc}) ) {
+    if ( ( ($ebayListing->{ProductListingDetails}->{UPC}||$itemSpecificsHash->{UPC}) && $slt->{upc}) && 
+         ( ($ebayListing->{ProductListingDetails}->{UPC}||$itemSpecificsHash->{UPC}) ne $slt->{upc}) ) {
         print $ofh_ERR "\nWARNING: itemID=$item_id  ebay UPC does not match INVENTORY table UPC";
     }
 
@@ -816,7 +816,7 @@ for my $item_id ( reverse @all_items ) {
     my $purchasePrice    = $cost;
     my $retailPrice      = $ebayListing->{StartPrice}->{content};
     my $weight           = $slt->{weight} || '0';
-    my $barcode          = $itemSpecificsHash->{UPC} ? $itemSpecificsHash->{UPC} : $slt->{upc};
+    my $barcode          = $ebayListing->{ProductListingDetails}->{UPC} || $itemSpecificsHash->{UPC} || $slt->{upc};
     my $shortDescription = $title;                                   # NOTE: nothing maps to this field, update manually if needed
     my $dimHeight        = '10';
     my $dimWidtht        = '8';
