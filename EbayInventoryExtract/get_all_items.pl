@@ -366,7 +366,7 @@ for my $item_id ( reverse @all_items ) {
 
   # Weight
   if ( ($ebayListing->{weight} != $ebayWeight) ) { # in total ouches
-    print $ofh_ERR "WARNING: itemid=$item_id - weight differs from ebay and Inventory tables";
+    print $ofh_ERR "\nWARNING: itemid=$item_id - weight differs from ebay and Inventory tables";
   }
 
   # Use weight in Inventory table first, then Ebay ( TODO: might want to change this )
@@ -551,7 +551,7 @@ for my $item_id ( reverse @all_items ) {
         $sth_productInfo->execute($variationSKU) or die "can't execute stmt";
         $var = $sth_productInfo->fetchrow_hashref;
       };
-      if ( $@ ) { print $ofh_ERR "\n\nERROR: $@ \n"; print "\nTitle: $title"; die; }
+      if ( $@ ) { print $ofh_ERR "\nERROR: $@ \n"; print "\nTitle: $title"; die; }
 
       my $cost = $var->{cost} || '0';
 
@@ -561,7 +561,7 @@ for my $item_id ( reverse @all_items ) {
       my $totalweight = $var->{weight};
       
       if ( ($var->{weight} != $ebayWeight) ) { # in total ouches
-        print $ofh_ERR "WARNING: itemid=$item_id - weight differs from ebay and Inventory tables";
+        print $ofh_ERR "\nWARNING: itemid=$item_id - weight differs from ebay and Inventory tables";
       }
 
       # Use weight in Inventory table first, then Ebay ( TODO: might want to change this )
@@ -779,7 +779,7 @@ for my $item_id ( reverse @all_items ) {
       $slt = $sth_productInfo->fetchrow_hashref;
     };
     if ( $@ ) {
-      print $ofh_ERR "\n\nERROR: $@ \n";
+      print $ofh_ERR "\nERROR: $@ \n";
       print $ofh_ERR "\ntitle: '$title' \n";
       die;
     }
@@ -790,7 +790,7 @@ for my $item_id ( reverse @all_items ) {
     my $totalweight = $slt->{weight};
     
     if ( ($slt->{weight} != $ebayWeight) ) { # in total ouches
-      print $ofh_ERR "WARNING: itemid=$item_id - weight differs from ebay and Inventory tables";
+      print $ofh_ERR "\nWARNING: itemid=$item_id - weight differs from ebay and Inventory tables";
     }
 
     # Use weight in Inventory table first, then Ebay ( TODO: might want to change this )
@@ -943,7 +943,7 @@ for my $sku ( keys %$allItemsItemSpecifics ) {
   $isvalues[0] = $sku;
   while( my ($isname,$isvalue) = each %{$allItemsItemSpecifics->{$sku}} ) {
     if ( ! defined( $iso{$isname} ) ) {
-      print "ERROR: SKU=$sku  ISNAME=$isname\n";
+      print "\nERROR: SKU=$sku  ISNAME=$isname\n";
       next;
     }
     my $pos = $iso{$isname}; 
