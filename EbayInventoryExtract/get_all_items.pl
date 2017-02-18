@@ -366,7 +366,7 @@ for my $item_id ( reverse @all_items ) {
 
   # Weight
   if ( ($ebayListing->{weight} != $ebayWeight) ) { # in total ouches
-    print $ofh_ERR "\nWARNING: itemid=$item_id - weight differs from ebay and Inventory tables";
+    print $ofh_ERR "\nWARNING: itemid=$item_id - weight differs from ebay ($ebayWeight) and Inventory tables ($ebayListing->{weight})";
   }
 
   # Use weight in Inventory table first, then Ebay ( TODO: might want to change this )
@@ -561,7 +561,7 @@ for my $item_id ( reverse @all_items ) {
       my $totalweight = $var->{weight};
       
       if ( ($var->{weight} != $ebayWeight) ) { # in total ouches
-        print $ofh_ERR "\nWARNING: itemid=$item_id - weight differs from ebay and Inventory tables";
+        print $ofh_ERR "\nWARNING: itemid=$item_id - weight differs from ebay ($ebayWeight) and Inventory tables ($var->{weight})";
       }
 
       # Use weight in Inventory table first, then Ebay ( TODO: might want to change this )
@@ -790,7 +790,7 @@ for my $item_id ( reverse @all_items ) {
     my $totalweight = $slt->{weight};
     
     if ( ($slt->{weight} != $ebayWeight) ) { # in total ouches
-      print $ofh_ERR "\nWARNING: itemid=$item_id - weight differs from ebay and Inventory tables";
+      print $ofh_ERR "\nWARNING: itemid=$item_id - weight differs from ebay ($ebayWeight) and Inventory tables ($slt->{weight})";
     }
 
     # Use weight in Inventory table first, then Ebay ( TODO: might want to change this )
