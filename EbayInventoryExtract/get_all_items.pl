@@ -42,22 +42,22 @@ else {
 my $PRODUCTION  = defined $opts{p} ? 1 : 0;
 my $DEBUG       = defined $opts{D} ? 1 : 0;
 my $infile      = defined $opts{I} ? $opts{I} : '';
-my $outfile     = defined $opts{O} ? $opts{O} : 'lw_import';
+my $outfile     = defined $opts{O} ? $opts{O} : 'AI_';
 
 print "\n\nDEV Mode. Use -p option for Production!\n\n" if ( ! $PRODUCTION );
 
-my $of_ERR = $outfile . '.error_log.csv';
-my $of_AI  = $outfile . '.AI_basic_product_import.csv';    # AI - AgileIron - Basic Item
-my $of_AIM = $outfile . '.AI_matrix_product_import.csv';   # AI - AgileIron - Item with Variations
-my $of_AIIS= $outfile . '.AI_item_specifics_import.csv';    # AI - AgileIron - Item Specifics (all items)
-my $of_BPI = $outfile . '.basic_product.csv';
-my $of_SLI = $outfile . '.stock_level.csv';
-my $of_ATT = $outfile . '.product_ext_propeties.csv';
-my $of_SUP = $outfile . '.product_supplier_info.csv';
-my $of_IMG = $outfile . '.images.csv';
-my $of_DES = $outfile . '.channel_desc_attr.csv';
-my $of_VG  = $outfile . '.variation_group.csv';
-my $of_SIV = $outfile . '.stock_item_variation.csv';
+my $of_ERR = $outfile . 'error_log.csv';
+my $of_AI  = $outfile . 'basic_product_import.csv';    # AI - AgileIron - Basic Item
+my $of_AIM = $outfile . 'matrix_product_import.csv';   # AI - AgileIron - Item with Variations
+my $of_AIIS= $outfile . 'item_specifics_import.csv';   # AI - AgileIron - Item Specifics (all items)
+my $of_BPI = $outfile . 'basic_product.csv';
+my $of_SLI = $outfile . 'stock_level.csv';
+my $of_ATT = $outfile . 'product_ext_propeties.csv';
+my $of_SUP = $outfile . 'product_supplier_info.csv';
+my $of_IMG = $outfile . 'images.csv';
+my $of_DES = $outfile . 'channel_desc_attr.csv';
+my $of_VG  = $outfile . 'variation_group.csv';
+my $of_SIV = $outfile . 'stock_item_variation.csv';
 
 my $html_filter = HTML::Restrict->new(
         rules => {
