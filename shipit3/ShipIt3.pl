@@ -226,38 +226,40 @@ Wx::Event::EVT_BUTTON($self, $self->{btn_print}->GetId, \&btn_print_onClick);
       Wx::Font->new(18, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_MAX, 0, '', wxFONTENCODING_DEFAULT) );
 
   # E-Packet: List of eligible countries ( According to USPS website 10/02/2016 - https://www.usps.com/business/international-shipping.htm )
-  my @epacket_list =
-    qw( Australia
-        Italy
+  my @epacket_list = qw(
+        Australia
         Belgium
-        Latvia
         Canada
-        Lithuania
         Croatia
-        Luxembourg
         Denmark
-        Malaysia
         Estonia
-        Malta
         Finland
-        Netherlands
         France
         Germany
-        Portugal
         Gibraltar
+        Hungary
+        Ireland
+        Israel
+        Italy
+        Japan
+        Latvia
+        Lithuania
+        Luxembourg
+        Malaysia
+        Malta
+        Netherlands
+        Portugal
         Singapore
         Spain
-        Hungary
         Sweden
-        Ireland
         Switzerland
-        Israel
-        );
+      );
 
-  push( @epacket_list, ('New Zealand', 'Great Britain', 'United Kingdom') ); # NOTE: United Kingdom is not actually on the list, so we have to
-                                                                             #       change in to 'Great Britain' before creating the label
-
+  push( @epacket_list, ('Hong Kong', 'New Zealand', 'Great Britain', 'United Kingdom') ); # NOTE: United Kingdom is not actually on the list, so we have to
+                                                                                          #       change in to 'Great Britain' before creating the label
   for my $c ( @epacket_list ) {
+    $c =~ s/^\s+//;
+    $c =~ s/\s+$//;
     $self->{epacket_eligible_countries}->{uc($c)} = 1;
   }
 
