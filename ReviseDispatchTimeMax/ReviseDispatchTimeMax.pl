@@ -46,7 +46,7 @@ else {
 }
 
 (! defined $opts{d}) && die "must supply -d <days>";
-($opts{d} < 0 || $opts{d} > 20) && die "must supply -d <0-20 days>";
+(! grep(/$opts{d}/, qw(1 2 3 4 5 10 15 20))  ) && die "must supply -d <1, 2, 3, 4, 5, 10, 15, or 20 days>";
 
 my $max_items           = defined $opts{m} ? $opts{m} : 0;
 my $REVISE_ITEM         = defined $opts{r} ? 1 : 0;
