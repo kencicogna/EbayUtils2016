@@ -118,6 +118,9 @@ sub sendRequest {
     }
     my $all_orderIDs = join( "\n", @all_orderIDs );
 
+    print "\nall_order_ids",Dumper($all_order_ids);
+    print "\nall_orderIDs",Dumper(\@all_orderIDs);
+
     # Get detailed info from ebay on this itemID
     my $request = $self->requestXML;
     $request =~ s/__ORDER_ID_ARRAY__/$all_orderIDs/;
@@ -326,8 +329,8 @@ END_REQUEST_XML
 #   print "\n\n\nGET IMAGE - XML: $request";
 #   die;
 
-#  my $r = $self->submit_request( $api_call_name, $request );    # Get list of order ID's
-my $r={};
+  my $r = $self->submit_request( $api_call_name, $request );    # Get list of order ID's
+# my $r={};
 
   my $variation_pic_url;
   if ( defined $r->{Item}->{Variations}->{Pictures}->{VariationSpecificPictureSet} ) {

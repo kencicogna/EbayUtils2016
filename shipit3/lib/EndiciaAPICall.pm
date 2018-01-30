@@ -122,11 +122,11 @@ sub _SetFields {
 
   # Sender
   $label->{FromName} = "The Teaching Toy Box";
-  $label->{ReturnAddress1} = "415 W. Belden Avenue";
-  $label->{ReturnAddress2} = "Suite J";
-  $label->{FromCity} = "Addison";
+  $label->{ReturnAddress1} = "1157 Verona Ridge Dr.";
+  # $label->{ReturnAddress2} = "";
+  $label->{FromCity} = "Aurora";
   $label->{FromState} = "IL";
-  $label->{FromPostalCode} = "60101";
+  $label->{FromPostalCode} = "60506";
   $label->{FromCountry} = "US";
   $label->{FromPhone} = "7081231234";
   $label->{FromEMail} = 'theteachingtoybox@gmail.com';
@@ -134,9 +134,12 @@ sub _SetFields {
   # Receipient
   $label->{ToName} =  $p->firstname .' '. $p->lastname;
   $label->{ToCompany} =  $p->company         if $p->company;
+
+  fix_long_addresses($p);  # Endicia label server requires a max of 47 characters on each address line    
   $label->{ToAddress1} =  $p->addressline1;
-  $label->{ToAddress2} =  $p->addressline2   if $p->addressline2 ;
-  $label->{ToAddress3} =  $p->addressline3   if $p->addressline3;
+  $label->{ToAddress2} =  $p->addressline2   if ( defined $p->addressline2 && length($p->addressline2)>0 );
+  $label->{ToAddress3} =  $p->addressline3   if ( defined $p->addressline3 && length($p->addressline3)>0 );
+  $label->{ToAddress4} =  $p->addressline4   if ( defined $p->addressline4 && length($p->addressline4)>0 );
   $label->{ToCity} =  $p->city;
   $label->{ToState} =  $p->state;
   $label->{ToPostalCode} = $p->dom_intl_flag eq 'D' && length($p->zip) > 5
@@ -144,9 +147,18 @@ sub _SetFields {
                          : $p->zip;
   $label->{ToCountry} =  $p->countryname;
   $label->{ToCountryCode} =  $p->country;
-  $label->{ToPhone} =  $p->phonenumber;
   $label->{ToEMail} =  $p->emailaddress;
 
+  # Receipient Phone Number - Domestic must be exactly 10 digits
+  #                           Intl must be 1-30  digits
+  my $phone = $p->phonenumber;
+  $phone =~ s/[^\d]//;
+  if ( $p->dom_intl_flag eq 'D' ) {
+    $label->{ToPhone} =  $phone if ( $phone =~ /^\d{10}$/ );
+  }
+  else {
+    $label->{ToPhone} =  $phone if ( $phone =~ /^\d{1,30}$/ );
+  }
 
   # Customs 
   if ( $p->dom_intl_flag eq 'I' ) {               # true if IPA/E-Packet
@@ -164,8 +176,7 @@ sub _SetFields {
       Value       => $p->total_price,
       HSTariffNumber => '950300',       # See https://www.usitc.gov/tata/hts/bychapter/index.htm  Chapter 95 
                                         # Endicia spec only allows for a 6 digit number (eventhough it can be 8 digits)
-      CountryOfOrigin => 'US',          # currently I think it's the country we are sending it to... 
-                                        # which is wrong I think, it should probably be China
+      CountryOfOrigin => 'US',          # Origin is 'US', but I think this is wrong... it should probably be China
     };
 
     # Customs form type
@@ -399,6 +410,72 @@ sub PrintLabel {
 
 } # End PrintLabel
 
+sub fix_long_addresses {
+  # Endicia label server requires a max of 47 characters on each address line    
+  # This method will split address line1 into multiple lines with a 
+  # max of 47 characters and on a word boundary
+  my $p = shift;
+
+  my $len1 = length($p->addressline1);
+  return if ( $len1 <= 47 ); 
+
+  my $len2 = defined $p->addressline2 ? length($p->addressline2) : 0;
+  my $len3 = defined $p->addressline3 ? length($p->addressline3) : 0;
+  my $len4 = defined $p->addressline4 ? length($p->addressline4) : 0;
+
+  my $a1 = $p->addressline1;
+  my $a2 = $len2 ? $p->addressline2 : '';
+  my $a3 = $len3 ? $p->addressline3 : '';
+  my $a4 = $len4 ? $p->addressline4 : '';
+
+  # Split address line 1
+  my @lines = $a1 =~ /(.{1,47}\W)/gms;
+
+  # Rearrange address lines, based on the number of lines address1 split into
+  if ( @lines == 2 ) {
+    die "Error: Can't fix long address, print manually." if ( $len4 );
+    $p->addressline4( $p->addressline3 ) if ( $len3 );
+    $p->addressline3( $p->addressline2 ) if ( $len2 );
+    $p->addressline2( $lines[1] );
+    $p->addressline1( $lines[0] );
+  }
+  elsif ( @lines == 3 ) {
+    die "Error: Can't fix long address, print manually." if ( $len3 );
+    $p->addressline4( $p->addressline2 ) if ( $len2 );
+    $p->addressline3( $lines[2] );
+    $p->addressline2( $lines[1] );
+    $p->addressline1( $lines[0] );
+  }
+  elsif ( @lines == 4 ) {
+    die "Error: Can't fix long address, print manually." if ( $len2 );
+    $p->addressline4( $lines[3] );
+    $p->addressline3( $lines[2] );
+    $p->addressline2( $lines[1] );
+    $p->addressline1( $lines[0] );
+  }
+  elsif ( @lines > 4 ) {
+    die "Error: Can't fix long address, print manually." if ( $len2 );
+  }
+
+  # Log address change to console
+  print <<END;
+***************************
+***** Address Updated *****
+***************************
+FROM:
+  $a1
+  $a2
+  $a3
+  $a4
+
+TO:
+  $p->{addressline1}
+  $p->{addressline2}
+  $p->{addressline3}
+  $p->{addressline4}
+
+END
+}
 
 sub _setTokenFromFile {
   # Set EndiciaAuthToken field based on file contents
@@ -423,10 +500,10 @@ sub _setHeaderValues() {
     # PRODUCTION
     $self->CallName          ( 'GetPostageLabel' );
     $self->Uri               ( 'www.envmgr.com/LabelService' );
-    $self->Proxy             ( 'https://elstestserver.endicia.com/LabelService/EwsLabelService.asmx' );
-    $self->RequesterID       ( '' );
-    $self->AccountID         ( '' );
-    $self->PassPhrase        ( '' );
+    $self->Proxy             ( 'https://labelserver.endicia.com/LabelService/EwsLabelService.asmx' );
+    $self->RequesterID       ( '1139691' );
+    $self->AccountID         ( '1139691' );
+    $self->PassPhrase        ( 'ILovetacos27' );
     $self->_setTokenFromFile ( 'cfg/endicia_api_production_token.txt' );
   }
   else {

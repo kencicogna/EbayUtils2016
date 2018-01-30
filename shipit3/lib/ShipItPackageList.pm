@@ -1,5 +1,6 @@
 package ShipItPackageList;
 
+use utf8;
 use Wx qw[:everything];
 use Moose;
 use ShipItPackage;

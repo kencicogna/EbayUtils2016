@@ -1351,11 +1351,11 @@ sub createXML_stamps() {
     $Package->{Sender}->{Company}   = 'The Teaching Toy Box';
     $Package->{Sender}->{FirstName} = 'Amy';
     $Package->{Sender}->{LastName}  = 'Sepelis';
-    $Package->{Sender}->{MultilineAddress}->{Line} = '415 W Belden';
-    $Package->{Sender}->{City}      = 'Addison';
+    $Package->{Sender}->{MultilineAddress}->{Line} = '1157 Verona Ridge Dr.';
+    $Package->{Sender}->{City}      = 'Aurora';
     $Package->{Sender}->{State}     = 'IL';
-    $Package->{Sender}->{ZIP}       = '60101';
-    $Package->{Sender}->{OrderedPhoneNumbers} = [{Number=>'(708)431-6142'}];  # Amy's phone number
+    $Package->{Sender}->{ZIP}       = '60506';
+    $Package->{Sender}->{OrderedPhoneNumbers} = [{Number=>'(630)815-4915'}];  # Amy's phone number
 
     # $Package->{Services}->{DeliveryConfirmation}  = 'true'; # 2014/08/21 - XML Spec changed. DeliveryConfirmation replaced by USPSTracking
     $Package->{Services}->{USPSTracking}  = 'true';
