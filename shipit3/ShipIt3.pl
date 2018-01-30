@@ -229,6 +229,7 @@ Wx::Event::EVT_BUTTON($self, $self->{btn_print}->GetId, \&btn_print_onClick);
   my @epacket_list = qw(
         Australia
         Belgium
+        Brazil
         Canada
         Croatia
         Denmark
@@ -1979,6 +1980,7 @@ sub tc_oz_evtTextEnter {
       elsif ( $self->isEPacketEligible($p->countryname) ) {
 
         # Note: Change 'United Kingdom' to 'Great Britain' because e-packet only allows the latter
+        #       Change 'Repulic of Croatia' to 'Croatia'
         $p->countryname('Great Britain') if (  $p->countryname =~ /United Kingdom/i );
 
         # ePacket: Send ePacket if destination is eligible
