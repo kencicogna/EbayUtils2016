@@ -1982,6 +1982,7 @@ sub tc_oz_evtTextEnter {
         # Note: Change 'United Kingdom' to 'Great Britain' because e-packet only allows the latter
         #       Change 'Repulic of Croatia' to 'Croatia'
         $p->countryname('Great Britain') if (  $p->countryname =~ /United Kingdom/i );
+        $p->countryname('Croatia') if (  $p->countryname =~ /Republic of Croatia/i );
 
         # ePacket: Send ePacket if destination is eligible
         $mail_class = $mc->{'E-Packet'}->{mailclass};
