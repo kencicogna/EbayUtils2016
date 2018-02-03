@@ -24,6 +24,9 @@ use POSIX;
 use Getopt::Std;
 use Storable 'dclone';
 
+use lib 'cfg';
+use EbayConfig;
+
 my %opts;
 getopts('i:raDI:O:A',\%opts);
 # -i <ebay item ID>		- perform operations on this single item
@@ -58,18 +61,13 @@ print "\n\nGetting eBay information......\n\n";
 # EBAY API INFO                                   #
 ###################################################
 
-my $header = HTTP::Headers->new;
-$header->push_header('X-EBAY-API-COMPATIBILITY-LEVEL' => '899');
-$header->push_header('X-EBAY-API-DEV-NAME'  => 'd57759d2-efb7-481d-9e76-c6fa263405ea');
-$header->push_header('X-EBAY-API-APP-NAME'  => 'KenCicog-a670-43d6-ae0e-508a227f6008');
-$header->push_header('X-EBAY-API-CERT-NAME' => '8fa915b9-d806-45ef-ad4b-0fe22166b61e');
-$header->push_header('X-EBAY-API-CALL-NAME' => '');                                       # Supply call name to submit_request() 
-$header->push_header('X-EBAY-API-SITEID'    => '0');                                      # 0 => usa
-$header->push_header('Content-Type'         => 'text/xml');
+# define the HTTP header
+my $header = $EbayConfig::ES_http_header;
 
 # eBayAuthToken
-my $eBayAuthToken = 'AgAAAA**AQAAAA**aAAAAA**mDaRVw**nY+sHZ2PrBmdj6wVnY+sEZ2PrA2dj6wBlISgAZiLpQqdj6x9nY+seQ**4EwAAA**AAMAAA**TkXPBPIB8nXXvAlKACLr1habWoQFwHJ0m0Q22eC9E4LhCBxg1BguA3qLlLvGIVRU35Fs9zpUk4yaxiKBTEtWvmnoXErKS+ZjXMRZ0nO0GR2D5l1ijCVrijp5Ck2lYDcYz+tsEDDCCvnyDrA55hyStngbiQCe+oSsp3nlIoLC//hshrxBiRbXGZ5+8k7Pd/RG0g5Sg94yYZ2alPswirGgbhI5uLXwuo/io8Us60+TXgPyNbs7RNyBaIqpVnTHVfgfSxqyvi4wtpCt+JYH508D+o/KC+B637aWY+76Cua8GByWmKvKFvX6AjEzKm0K+Dr7CBAuDCAdZnRFs3ELcXUhPpzUG4HOkKz2QqOn+VNrkI2LA6I0yCRRCiB/fSVb+gtFTqWTSGl/0ukzOi7fbkbCEvw1fHdQFVuRjdG8QF2CKwt1Nxhqm4q3ainfcAuAm9qpzpcqpYZ8QzBiE3cJ4593Uv8Qm6EEnmnspcLkpjsmOzHp01xFBFIftXugcrss5X0VGmyr8MSEbkvKpg0/vwhbw9wj3Pbf1A9IKrkc8ZmzCzBThixkuMHqerNgwXGMqsiy4IM9uXcrUdzbFN7eqtokYR+cIFb3DkkThA+GbwJerzdXVvK1jA6HpszxY/aGhc168IzHKNZUQ5w5+c8mxwVDsZ+My1eHBN1aryGmPdt8I/RfoSfpSSlaZo6cVdH4RAjc1cdNWt8nNC2DL+K0zmHIs/x0rnrcaiq8TjAkaqSOoD4j5Qq50PaFAngqRSu48Ykp';
+my $eBayAuthToken = $EbayConfig::ES_eBayAuthToken;
 
+# XML
 my $request_getitem_default = <<END_XML;
 <?xml version='1.0' encoding='utf-8'?>
 <GetItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
