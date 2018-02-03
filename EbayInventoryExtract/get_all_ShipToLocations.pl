@@ -57,10 +57,20 @@ END_XML
 # Get list of all item id's
 ################################################################################
 
+my @all_countries;
+
 my $response = submit_request( 'GeteBayDetails', $GeteBayDetailsRequest_xml, $header );
+#print Dumper($response);
 
-print Dumper($response);
+for my $c ( @{$response->{CountryDetails}} ) 
+{
+   push ( @all_countries, $c->{Description});
+}
 
+for my $c ( sort @all_countries ) 
+{
+  print "$c\n";
+}
 
 exit;
 
