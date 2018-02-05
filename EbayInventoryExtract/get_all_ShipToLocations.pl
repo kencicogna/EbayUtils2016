@@ -43,10 +43,12 @@ my $GeteBayDetailsRequest_xml = <<END_XML;
   <RequesterCredentials>
     <eBayAuthToken>$eBayAuthToken</eBayAuthToken>
   </RequesterCredentials>
-  <DetailName>CountryDetails</DetailName>    
+  <DetailName>ShippingLocationDetails</DetailName>    
 </GeteBayDetailsRequest>
 END_XML
 
+#  <DetailName>CountryDetails</DetailName>    
+# ShippingLocationDetails
 
 ###########################################################
 # END EBAY API INFO                                       #
@@ -60,7 +62,7 @@ END_XML
 my @all_countries;
 
 my $response = submit_request( 'GeteBayDetails', $GeteBayDetailsRequest_xml, $header );
-#print Dumper($response);
+print Dumper($response);
 
 for my $c ( @{$response->{CountryDetails}} ) 
 {
