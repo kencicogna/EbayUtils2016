@@ -13,18 +13,19 @@ use HTTP::Headers;
 use HTML::Restrict;
 use HTML::Entities;
 use MIME::Base64;
-use DBI;
-use XML::Simple qw(XMLin XMLout);
-# use XML::Tidy;
 use Date::Calc 'Today';
 use Data::Dumper 'Dumper';			
 $Data::Dumper::Sortkeys = 1;
 $Data::Dumper::Terse = 0;
 $Data::Dumper::Indent = 1;
-use File::Copy qw(copy move);
 use POSIX;
 use Getopt::Std;
 use Storable 'dclone';
+
+use lib '../cfg';
+use EbayConfig;
+use JSON;
+use URI::Encode qw(uri_encode uri_decode);
 
 my %opts;
 getopts('i:raDI:O:A',\%opts);
@@ -47,21 +48,24 @@ my $infile      = defined $opts{I} ? $opts{I} : '';
 my $outfile     = defined $opts{O} ? $opts{O} : 'dump';
 my $ReturnAll   = defined $opts{A} ? 1 : 0;
 
-print "\n\nGetting eBay information......\n\n";
+print "\n\nGetting User Access token......\n\n";
 
 
 ###################################################
 # EBAY API INFO                                   #
 ###################################################
-my $devid = 'd57759d2-efb7-481d-9e76-c6fa263405ea';
-my $appid = 'KenCicog-a670-43d6-ae0e-508a227f6008';   # client ID
-my $certid = '8fa915b9-d806-45ef-ad4b-0fe22166b61e';  # client's secret key
+my $devid = $EbayConfig::ES_DevID;
+my $appid = $EbayConfig::ES_AppID;   # client ID
+my $certid = $EbayConfig::ES_CertID;  # client's secret key
+my $authenticationCodeHTMLEncoded = $EbayConfig::ES_OAuthAuthenticationCode;
+my $authenticationCode = uri_decode($authenticationCodeHTMLEncoded);
 my $credentials = MIME::Base64::encode_base64("$appid:$certid");
+chomp($credentials);
 
 my $userAgent = LWP::UserAgent->new;
-my $HttpHeaders = HTTP::Headers->new;
-$HttpHeaders->push_header('Content-Type'  => 'application/x-www-form-urlencoded');
-$HttpHeaders->push_header('Authorization' => "Basic $credentials");
+my $httpHeaders = HTTP::Headers->new;
+$httpHeaders->push_header('Content-Type'  => 'application/x-www-form-urlencoded');
+$httpHeaders->push_header('Authorization' => "Basic $credentials");
 
 
 ################################################################################
@@ -69,16 +73,52 @@ $HttpHeaders->push_header('Authorization' => "Basic $credentials");
 ################################################################################
 
 # eBay OAuth2 Token (expires in 5 minutes)
-my $eBayOAuth2Token = getOAuth2Token();
+#  ...not sure whwere i got this. User Access token is good for 2 hours (7200 seconds)
 
-print "\n\nTOKEN: '$eBayOAuth2Token' \n\n";
+my $userAccessToken = GetUserAccessToken( $authenticationCodeHTMLEncoded );
+
+print "\n\nUSER ACCESS TOKEN: '$userAccessToken' \n\n";
 
 
 exit;
 
 ####################################################################################################
 
-sub getOAuth2Token {
+# Getting a User Access token using the auth code
+sub GetUserAccessToken {
+  my $authCode = shift;
+  my ($endpoint, $request, $requestBody, $response);
+
+  $endpoint = 'https://api.ebay.com/identity/v1/oauth2/token';
+  $requestBody = 
+      join( '&', 
+            (
+              'grant_type=authorization_code',
+	      'code='.$authCode,
+	      'redirect_uri='.'Ken_Cicogna-KenCicog-a670-4-xcadx'
+            )
+          );
+
+  $request = HTTP::Request->new(
+    "POST",
+    $endpoint,
+    $httpHeaders,
+    $requestBody
+  );
+
+  #print "\n httpHeaders : ",Dumper($httpHeaders);
+  #print "\n requestBody : ",Dumper($requestBody);
+  print "\n Request     : ",Dumper($request); exit;
+
+  # Submit Request
+  $response = $userAgent->request($request);		# SEND REQUEST
+  print Dumper($response);
+
+  return $response->content;
+}
+
+
+sub getOAuth2Code {
   my ($endpoint, $request, $requestBody, $response);
 
   # TODO: don't need to get auth every time... Also, don't need to get access token, use "refresh token"
@@ -94,7 +134,7 @@ sub getOAuth2Token {
   $request = HTTP::Request->new(
     "GET",
     $endpoint,
-    $HttpHeaders,
+    $httpHeaders,
     $requestBody
   );
 
@@ -127,11 +167,11 @@ sub getOAuth2Token {
   $request = HTTP::Request->new(
     "POST",
     $endpoint,
-    $HttpHeaders,
+    $httpHeaders,
     $requestBody
   );
 
-	print "\n HttpHeaders : ",Dumper($HttpHeaders);
+	print "\n httpHeaders : ",Dumper($httpHeaders);
 	print "\n requestBody : ",Dumper($requestBody);
 	print "\n Request     : ",Dumper($request);
 
