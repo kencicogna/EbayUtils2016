@@ -47,7 +47,8 @@ our $ODBC;
 
 if ( $host eq "Ken-Laptop" ) {
   chdir('C:/Users/Ken/Documents/');
-  $ODBC = 'BTData_DEV_SQLEXPRESS';
+#  $ODBC = 'BTData_DEV_SQLEXPRESS';
+  $ODBC = 'BTData_PROD_SQLEXPRESS';
 }
 else {
   chdir('C:/Users/Owner/Documents/revise_item/');
@@ -364,7 +365,7 @@ ON
 	t.variation = s.variation
 WHEN MATCHED THEN
   UPDATE SET 
-        t.upc = s.upc,
+			  t.upc = isnull(s.upc,t.upc),
 	      t.location         = UPPER(s.location),
         t.last_modified    = getdate(),
 			  t.weight           = s.weight,
@@ -608,8 +609,8 @@ sub __load_items {
         }
 
         # Update location table
-        for my $variation ( keys %$img_map ) {
-          my $sku   = $sku_map->{$variation};
+        for my $variation ( keys %$upc_map ) {
+          my $sku       = $sku_map->{$variation};
           my $image_url = $img_map->{$variation};
 					my $upc       = $upc_map->{$variation};
           $sth->execute($item_id, $brand, $sku, $title, $variation, $image_url, $image_url_main,$upc,$weight_oz) or die "can't execute query: $sql";
