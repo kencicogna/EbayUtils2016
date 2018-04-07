@@ -389,17 +389,15 @@ ON
 	t.variation = s.variation
 WHEN MATCHED THEN
   UPDATE SET 
-       t.title            = s.title, 
 			 t.supplier         = isnull(s.supplier,t.supplier),
-	     t.variation        = s.variation,
 	     t.ebayitemid       = s.ebayitemid,
-	     t.sku          = s.sku,
+	     t.sku              = s.sku,
        t.last_modified    = getdate(),
        t.image_url        = s.image_url,
        t.main_image_url   = s.main_image_url,
-       t.active           = 1,
-			 t.upc = isnull(s.upc,t.upc),
-			 t.weight           = s.weight
+			 t.upc              = isnull(s.upc,t.upc),
+			 t.weight           = isnull(s.weight,t.weight),
+       t.active           = 1
 WHEN NOT MATCHED THEN
   INSERT (ebayitemid, supplier, sku, title, variation, last_modified, image_url, main_image_url, active, upc, weight)
   VALUES (s.ebayitemid, s.supplier, s.sku, s.title, s.variation, getdate(), s.image_url, s.main_image_url, 1, s.upc, s.weight)
