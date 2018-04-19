@@ -386,17 +386,17 @@ USING (
 ) AS s (ebayitemid, supplier, sku, title, variation, image_url, main_image_url, upc,weight)
 ON 
   t.title     = s.title and
-	t.variation = s.variation
+  isnull(t.variation,'') = isnull(s.variation,'')
 WHEN MATCHED THEN
   UPDATE SET 
-			 t.supplier         = isnull(s.supplier,t.supplier),
+			 t.supplier         = isnull(t.supplier,s.supplier),
 	     t.ebayitemid       = s.ebayitemid,
 	     t.sku              = s.sku,
        t.last_modified    = getdate(),
        t.image_url        = s.image_url,
        t.main_image_url   = s.main_image_url,
-			 t.upc              = isnull(s.upc,t.upc),
-			 t.weight           = isnull(s.weight,t.weight),
+			 t.upc              = isnull(t.upc,s.upc),
+			 t.weight           = isnull(t.weight,s.weight),
        t.active           = 1
 WHEN NOT MATCHED THEN
   INSERT (ebayitemid, supplier, sku, title, variation, last_modified, image_url, main_image_url, active, upc, weight)
