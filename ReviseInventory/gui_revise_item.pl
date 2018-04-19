@@ -226,6 +226,8 @@ my $request_getitem2_default = <<END_XML;
 	<OutputSelector>UPC</OutputSelector>
 	<OutputSelector>ItemSpecifics</OutputSelector>
   <OutputSelector>ShippingPackageDetails</OutputSelector>
+  <OutputSelector>SellingStatus</OutputSelector>
+  <OutputSelector>Quantity</OutputSelector>
 </GetItemRequest>
 END_XML
 #<OutputSelector>Item</OutputSelector>
@@ -562,8 +564,8 @@ sub __load_items {
 			my $ozs = $r->{ShippingPackageDetails}->{WeightMinor}->{content};
 			my $weight_oz = ($lbs*16) + $ozs;
 
-      my $gross_qty = $r->{Quantity};
-      my $sold_qty  = $r->{SellingStatus}->{QuantitySold};
+      my $gross_qty = $r->{Quantity} ? $r->{Quantity} : 0;
+      my $sold_qty  = $r->{SellingStatus}->{QuantitySold} ? $r->{SellingStatus}->{QuantitySold} : 0 ;
       my $avail_qty = $gross_qty - $sold_qty;
 
       my $brand = get_Brand($r->{ItemSpecifics}); # supplier
@@ -616,7 +618,7 @@ sub __load_items {
           my $sku       = $sku_map->{$variation};
           my $image_url = $img_map->{$variation};
 					my $upc       = $upc_map->{$variation};
-          $sth->execute($item_id, $brand, $sku, $title, $variation, $image_url, $image_url_main,$upc,$weight_oz) or die "can't execute query: $sql";
+          $sth->execute($item_id, $brand, $sku, $title, $variation, $image_url, $image_url_main,$upc,$weight_oz,$avail_qty) or die "can't execute query: $sql";
         }
       }
       else {
