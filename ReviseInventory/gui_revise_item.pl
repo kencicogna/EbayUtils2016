@@ -382,8 +382,8 @@ END_SQL
   $self->{sql}->{upsert_UPDATE_LOC} = <<END_SQL;
 MERGE INTO Inventory t
 USING (
-  VALUES (?,?,?,?,?,?,?,?,?)
-) AS s (ebayitemid, supplier, sku, title, variation, image_url, main_image_url, upc,weight)
+  VALUES (?,?,?,?,?,?,?,?,?,?)
+) AS s (ebayitemid, supplier, sku, title, variation, image_url, main_image_url, upc, weight, quantity)
 ON 
   t.title     = s.title and
   isnull(t.variation,'') = isnull(s.variation,'')
@@ -397,10 +397,11 @@ WHEN MATCHED THEN
        t.main_image_url   = s.main_image_url,
 			 t.upc              = isnull(t.upc,s.upc),
 			 t.weight           = isnull(t.weight,s.weight),
+			 t.quantity         = s.quantity,
        t.active           = 1
 WHEN NOT MATCHED THEN
-  INSERT (ebayitemid, supplier, sku, title, variation, last_modified, image_url, main_image_url, active, upc, weight)
-  VALUES (s.ebayitemid, s.supplier, s.sku, s.title, s.variation, getdate(), s.image_url, s.main_image_url, 1, s.upc, s.weight)
+  INSERT (ebayitemid, supplier, sku, title, variation, last_modified, image_url, main_image_url, active, upc, weight, quantity)
+  VALUES (s.ebayitemid, s.supplier, s.sku, s.title, s.variation, getdate(), s.image_url, s.main_image_url, 1, s.upc, s.weight, s.quantity)
 ;
 END_SQL
 
@@ -561,7 +562,11 @@ sub __load_items {
 			my $ozs = $r->{ShippingPackageDetails}->{WeightMinor}->{content};
 			my $weight_oz = ($lbs*16) + $ozs;
 
-      my $brand     = get_Brand($r->{ItemSpecifics}); # supplier
+      my $gross_qty = $r->{Quantity};
+      my $sold_qty  = $r->{SellingStatus}->{QuantitySold};
+      my $avail_qty = $gross_qty - $sold_qty;
+
+      my $brand = get_Brand($r->{ItemSpecifics}); # supplier
 
       if ( defined $r->{Variations} ) {
         # get variation/sku
@@ -621,7 +626,7 @@ sub __load_items {
         my $sku   = $r->{SKU};
         my $upc       = get_UPC($r->{ItemSpecifics});
 			  
-        $sth->execute($item_id, $brand, $sku, $title, $variation, $image_url, $image_url_main, $upc,$weight_oz) or die "can't execute query: $sql";
+        $sth->execute($item_id, $brand, $sku, $title, $variation, $image_url, $image_url_main, $upc,$weight_oz,$avail_qty) or die "can't execute query: $sql";
       }
 
     } # End for @all_items loop
