@@ -46,7 +46,8 @@ chomp($host);
 our $ODBC;
 
 if ( $host eq "Ken-Laptop" ) {
-  chdir('C:/Users/Ken/Documents/');
+  #chdir('C:/Users/Ken/Documents/');
+  chdir('C:/Users/Ken/Documents/GitHub/EbayUtils2016/ReviseInventory');
 #  $ODBC = 'BTData_DEV_SQLEXPRESS';
   $ODBC = 'BTData_PROD_SQLEXPRESS';
 }
