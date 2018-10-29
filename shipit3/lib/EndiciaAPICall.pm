@@ -511,7 +511,7 @@ sub _setHeaderValues() {
     $self->CallName          ( 'GetPostageLabel' );
     $self->Uri               ( 'www.envmgr.com/LabelService' );
     $self->Proxy             ( 'https://elstestserver.endicia.com/LabelService/EwsLabelService.asmx' );
-    $self->RequesterID       ( 'lxxx' );
+    $self->RequesterID       ( '2502641' );
     $self->AccountID         ( '2502641' );
     $self->PassPhrase        ( 'its only a FLESH w0und!' );
 #     $self->AccountID         ( '2513440' );
