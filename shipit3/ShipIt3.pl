@@ -249,6 +249,7 @@ Wx::Event::EVT_BUTTON($self, $self->{btn_print}->GetId, \&btn_print_onClick);
         Malaysia
         Malta
         Netherlands
+	Norway
         Portugal
         Singapore
         Spain
