@@ -229,6 +229,7 @@ my $request_getitem2_default = <<END_XML;
   <OutputSelector>ShippingPackageDetails</OutputSelector>
   <OutputSelector>SellingStatus</OutputSelector>
   <OutputSelector>Quantity</OutputSelector>
+  <OutputSelector>Site</OutputSelector>
 </GetItemRequest>
 END_XML
 #<OutputSelector>Item</OutputSelector>
@@ -511,7 +512,7 @@ sub __load_items {
     # UPDATE Inventory TABLE   (eBayItemID, ImageURL, active flag, etc)
     my $itemcnt=0;
 
-#TODO: ADD LINE BACK IN!  COMMENTED OUT FOR TESTING.
+#TODO: Comment this line when testing, so that the 'active' flag on the db does not get cleared.
     $self->{dbh}->do( $self->{sql}->{clear_active_flag} ) or die "can't execute stmt";
 
 		my $sql = $self->{sql}->{upsert_UPDATE_LOC};
@@ -519,9 +520,6 @@ sub __load_items {
 
     # Only run this to update/fix the Inventory table (i.e. to make sure eBayItemID is current)
     for my $item_id ( uniq sort @all_items ) {
-
-#TODO: COMMENT OUT THIS LINE. UNCOMMENTED FOR TESTING.
-#next unless ( $item_id =~ /281957643708/ );
 
       $itemcnt++;
       print "\nListing #$itemcnt ( $item_id )";
@@ -535,9 +533,12 @@ sub __load_items {
       my $r = $self->submit_request();
       $r = $r->{Item};
 
-#TODO: COMMENT OUT THIS LINE. UNCOMMENTED FOR TESTING.
-#     print Dumper($r);
-#			exit;
+      # Only sync listing on US Site to the database! 
+      #   Otherwise there will be duplicates by SKU (CustomLabel) - 12/31/2018
+      if ( ! defined($r->{Site}) ) {
+        die "\nERROR: Can't determine Site (US, UK, AU, etc...) onwhich item is listed)";
+      }
+      next if ( $r->{Site} ne "US" );
 
       my $title = $r->{Title};
 
