@@ -37,9 +37,10 @@ use List::MoreUtils qw/uniq/;
 use EbayConfig;
 
 my %opts;
-getopts('u',\%opts);
+getopts('uo',\%opts);
 
 my $UPDATE_LOC = $opts{u} ? 1 : 0;
+my $OUTPUT = $opts{o} ? $opts{o} : "";
 
 my $host = `hostname`;
 chomp($host);
