@@ -7,9 +7,12 @@
  
 
 use strict;
+use Getopt::Std;
 use Data::Dumper 'Dumper';
 use Text::CSV_XS;
 use DBI;
+
+$|=1;
  
 my $basefile = 'FileExchange_Response_47120668';
 my $ODBC     = 'BTData_PROD_SQLEXPRESS';
@@ -21,6 +24,21 @@ my $us_listings = {};
 my $parentSite = '';
 my $parentItemID = '';
 my $type = '';
+
+my %opts;
+getopts('i:s',\%opts);
+
+# -i <input file>  - Ebay File Exchange (Standard price/quantity)
+# -s               - Skip duplicate SKU's
+
+die "\nUsage: $0 -i <Ebay FileExchange file>\n\n" unless $opts{i};
+my $inputfile = $opts{i};
+(my $outputfile = $inputfile) =~ s/csv/.out.csv/;
+
+my $skip_dups = $opts{s};
+
+# Init
+my %all_skus;   # check for dups
 
 
 # DB Connection
@@ -34,11 +52,10 @@ my $dbh = DBI->connect( "DBI:ODBC:$ODBC", 'shipit2', 'shipit2',
                 )
     || die "\n\nDatabase connection not made: $DBI::errstr\n\n";
 
-
 # Create csv parser object
 my $csv = Text::CSV_XS->new ({ binary => 1, auto_diag => 1 });
 
-open my $fh, "<:encoding(unicode)", "$basefile.csv" or die "can't open $basefile.csv: $!";
+open my $fh, "<:encoding(unicode)", $inputfile or die "can't open $inputfile: $!";
 
 while (my $row = $csv->getline ($fh)) {
 
@@ -84,14 +101,16 @@ while (my $row = $csv->getline ($fh)) {
       $parentItemID = '';
     }
 
-    next if ( $site ne 'US' );
+    # This line needs to here, so that ParentSite get set, before skipping to the next record
+    next if ( $site ne 'US' ); 
+
+    # Only count US site SKU's (we know the SKU is duplicated across sites)
+    $all_skus{$sku}++ if $sku;
 
     $us_listings->{$itemID}->{parent} = $row;
 
-    # Debug
     if ( ! $sku ) {
       $us_listings->{$itemID}->{update}++;
-      #print "\n\nType: $type\nSKU:$sku\nID: $itemID\nTitle: $row->[2]\nParent Site: $parentSite\nSite: $site\nVariations: $row->[9]\n";
     }
 
   }
@@ -103,17 +122,26 @@ while (my $row = $csv->getline ($fh)) {
 
     next if ( $parentSite ne 'US' );
 
+    $all_skus{$sku}++ if $sku;
+
     push( @{$us_listings->{$parentItemID}->{variations}}, $row);
 
-    # Debug
     if ( ! $sku ) {
       $us_listings->{$itemID}->{update}++;
-      #print "\n\tType: Variation\n\tSKU: $sku\n\tID: $itemID\n\tTitle: $row->[2]\n\tParent Site: $parentSite\n\tSite: $site\n\tVariations: $row->[9]\n";
     }
   }
 
 }
 close $fh;
+
+my $dups;
+for my $s ( keys %all_skus ) {
+  if ( $all_skus{$s} > 1 ) {
+    print "\nDuplicate SKU found: '$s'";
+    $dups++;
+  }
+}
+die "\n\nERROR: $dups dupilcate SKU's found." if ( $dups && !$skip_dups );
 
 
 #
@@ -124,7 +152,7 @@ close $fh;
 my $csv = Text::CSV_XS->new ({ binary => 1, eol => $/ });
 
 # Open output file
-open my $outfh, ">", "$basefile.out.csv" or die "$basefile.out.csv: $!";
+open my $outfh, ">", $outputfile or die "Can't open $outputfile: $!";
 
 # Write header row
 $csv->print ($outfh, $header_row) or $csv->error_diag;
@@ -172,7 +200,7 @@ foreach my $id ( %$us_listings ) {
 
 }
 
-close $outfh or die "$basefile.out.csv: $!";
+close $outfh or die "$outputfile: $!";
 
  
 exit;
