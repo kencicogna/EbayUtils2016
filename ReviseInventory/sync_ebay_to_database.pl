@@ -20,6 +20,7 @@ use File::Copy qw(copy move);
 use POSIX qw(strftime);
 use Getopt::Std;
 use List::MoreUtils qw/uniq/;
+use Text::CSV_XS;
 
 use EbayConfig;
 
@@ -27,13 +28,13 @@ use EbayConfig;
 # Command Line Options
 ####################################################################################################
 my %opts;
-getopts('ueDi:',\%opts);
+getopts('ueDi:o:',\%opts);
 
 my $UPDATE      = $opts{u} ? $opts{u} : 0;
 my $UPDATE_EBAY = $opts{e} ? $opts{e} : 0;
 my $DEBUG       = $opts{D} ? $opts{D} : 0;
-my $ITEM_ID     = $opts{i} ? $opts{i} : 0;     # Only process one item
-
+my $itemId      = $opts{i} ? $opts{i} : 0;  # Only process one item (default is all items)
+my $outfile     = $opts{o} ? $opts{o} : 0;
 
 ####################################################################################################
 # Initialization
@@ -50,6 +51,20 @@ if ( $host eq "Ken-Laptop" ) {
 else {
   chdir('C:/Users/Owner/Documents/GitHub/EbayUtils2016/ReviseInventory');
   $ODBC = 'BTData_PROD_SQLEXPRESS';
+}
+
+# Parse itemId(s) if provided
+my @all_items;
+if ( $itemId ) {
+  my @item_list = split (',', $itemId);
+	push(@all_items,@item_list);
+}
+
+# Output file and CSV Parser
+my ($ofh, $csv);
+if ( $outfile ) {
+  $csv = Text::CSV_XS->new ({ binary => 1, auto_diag => 1, eol => $/ });
+  open $ofh, ">:encoding(utf8)", $outfile or die "Can't open output file '$outfile': $!";
 }
 
 ###################################################
@@ -218,7 +233,8 @@ $self->{backup_table} = 'Inventory_' . $timestamp;
 $self->{sql}->{backup_inventory_table} = "select * into $self->{backup_table} from Inventory";
 
 # SQL: Clear the active flag before updating
-$self->{sql}->{clear_active_flag} = 'update Inventory set active=0';
+$self->{sql}->{clear_active_flags} = 'update Inventory set active=0';
+$self->{sql}->{clear_active_flag}  = 'update Inventory set active=0 where ebayItemId = ?';
 
 # SQL: Insert/Update the Inventory table (when UPDATE (-u) switch is given)
 # NOTE: Merge requires a semi-colon at the end (99% sure).
@@ -275,39 +291,38 @@ $self->{dbh} =
 ###################################################
 my $pagenumber=1;
 my $maxpages=999;
-my @all_items;
 
-while ( $pagenumber <= $maxpages ) {
-  $self->{request} = $self->{request_getmyebayselling_default};
-  $self->{request} =~ s/__PAGE_NUMBER__/$pagenumber/;
+if ( @all_items == 0 ) {
+  while ( $pagenumber <= $maxpages ) {
+    $self->{request} = $self->{request_getmyebayselling_default};
+    $self->{request} =~ s/__PAGE_NUMBER__/$pagenumber/;
 
-  $self->{objHeader}->remove_header('X-EBAY-API-CALL-NAME');
-  $self->{objHeader}->push_header  ('X-EBAY-API-CALL-NAME'=>'GetMyeBaySelling' );
+    $self->{objHeader}->remove_header('X-EBAY-API-CALL-NAME');
+    $self->{objHeader}->push_header  ('X-EBAY-API-CALL-NAME'=>'GetMyeBaySelling' );
 
-  my $response_hash = submit_request($self);
+    my $response_hash = submit_request($self);
 
-  if ($pagenumber==1) {
-    $maxpages = $response_hash->{ActiveList}->{PaginationResult}->{TotalNumberOfPages};
+    if ($pagenumber==1) {
+      $maxpages = $response_hash->{ActiveList}->{PaginationResult}->{TotalNumberOfPages};
+    }
+
+    print "\npage $pagenumber of $maxpages";
+    $pagenumber++;
+
+    for my $i ( @{$response_hash->{ActiveList}->{ItemArray}->{Item}} ) {
+      # Exclude foreign listings by currency (not perfect, some other countries could use USD)
+      # But, by doing a check here, we avoid a lot of extra API calls later 
+      next if ($i->{SellingStatus}->{CurrentPrice}->{currencyID} ne 'USD');
+
+      # Skip item, if a single item ID was given (-i)
+      next if ($itemId && $i->{ItemID} != $itemId);
+
+      push(@all_items, $i->{ItemID});
+    }
   }
-
-  print "\npage $pagenumber of $maxpages";
-  $pagenumber++;
-
-  for my $i ( @{$response_hash->{ActiveList}->{ItemArray}->{Item}} ) {
-    # Exclude foreign listings by currency (not perfect, some other countries could use USD)
-    # But, by doing a check here, we avoid a lot of extra API calls later 
-    next if ($i->{SellingStatus}->{CurrentPrice}->{currencyID} ne 'USD');
-
-    # Skip item, if a single item ID was given (-i)
-    next if ($ITEM_ID && $i->{ItemID} != $ITEM_ID);
-
-    push(@all_items, $i->{ItemID});
-  }
-
 }
 
 print "\n\nNumber of items found on Ebay: ", scalar(@all_items), "\n\n";
-exit;
 
 ###################################################
 # UPDATE Inventory TABLE                          #
@@ -317,8 +332,17 @@ if ( $UPDATE ) {
   # Make auto backup of Inventory table
   $self->{dbh}->do( $self->{sql}->{backup_inventory_table} ) or die "can't execute stmt";
 
-  # Clear active flag on Inventory table
-  $self->{dbh}->do( $self->{sql}->{clear_active_flag} ) or die "can't execute stmt";
+  if ( @all_items ) {
+    # Clear actives flag(s) only for itemId(s) provided
+    my $sth = $self->{dbh}->prepare( $self->{sql}->{clear_active_flag} ) or die "can't execute stmt";
+    for my $id ( @all_items ) {
+      $sth->execute( $id ) or die "can't execute stmt";
+    }
+  }
+  else {
+    # Clear ALL active flag on Inventory table
+    $self->{dbh}->do( $self->{sql}->{clear_active_flags} ) or die "can't execute stmt";
+  }
 }
 
 # Prepare merge inventory stmt
@@ -345,9 +369,8 @@ for my $item_id ( uniq sort @all_items ) {
   my $r = submit_request($self);
   $r = $r->{Item};
 
-  # NOTE: IMPORTANT!
-  #       Only sync listing on US Site to the database! 
-  #       Otherwise there will be duplicates by SKU (CustomLabel) - 12/31/2018
+  # NOTE: IMPORTANT! Only sync listing on US Site to the database. 
+  #       Otherwise there will be duplicates by SKU (CustomLabel)
   if ( ! defined($r->{Site}) ) {
     die "\nERROR: Can't determine Site (US, UK, AU, etc...) on which item is listed!)";
   }
@@ -382,24 +405,19 @@ for my $item_id ( uniq sort @all_items ) {
   my $ozs = $r->{ShippingPackageDetails}->{WeightMinor}->{content};
   my $weight_oz = ($lbs*16) + $ozs;
 
-  my $gross_qty;
-  my $sold_qty;
-  my $avail_qty;
-
   my $brand = get_Brand($r->{ItemSpecifics}); # i.e. Supplier
 
   if ( defined $r->{Variations} ) {
     ################################################################################ 
     # VARIATIONS
     ################################################################################ 
-    
-    # get variation specific details
-    #my $sku_map={};
-    #my $img_map={};
-    #my $upc_map={};
     my $variations={};
+    my $gross_qty;
+    my $sold_qty;
+
     for my $v ( @{$r->{Variations}->{Variation}} ) {
       my $var;
+
       if ( ref($v->{VariationSpecifics}->{NameValueList} ) eq 'ARRAY' ) {
         $var = $v->{VariationSpecifics}->{NameValueList}->[0]->{Value};
       }
@@ -407,26 +425,22 @@ for my $item_id ( uniq sort @all_items ) {
           $var = $v->{VariationSpecifics}->{NameValueList}->{Value};
       }
 
-      #$sku_map->{ $var } = $v->{SKU};
-      #$img_map->{ $var } = $image_url_main; # default image, may be replaced below
+      $variations->{$var}->{SKU} = $v->{SKU};
+      $variations->{$var}->{IMG} = $image_url_main;   # default image (may be replaced below)
+      $variations->{$var}->{UPC} = defined $v->{VariationProductListingDetails}->{UPC}
+                                   ?  $v->{VariationProductListingDetails}->{UPC}
+                                   : '';
 
-      $variations->{ $var }->{SKU} = $v->{SKU};
-      $variations->{ $var }->{IMG} = $image_url_main;   # default image (may be replaced below)
-
-      if ( defined $v->{VariationProductListingDetails}->{UPC} ) {
-        $variations->{ $var }->{UPC} = $v->{VariationProductListingDetails}->{UPC};
-      }
-
-      # Get Quantity
-      $gross_qty = $var->{Quantity} ? $var->{Quantity} : 0;
-      $sold_qty  = $var->{SellingStatus}->{QuantitySold} ? $var->{SellingStatus}->{QuantitySold} : 0;
+      # Calulate quantity available
+      $gross_qty = $v->{Quantity} ? $v->{Quantity} : 0;
+      $sold_qty  = $v->{SellingStatus}->{QuantitySold} ? $v->{SellingStatus}->{QuantitySold} : 0;
       $variations->{$var}->{QTY} = $gross_qty - $sold_qty;
     }         
 
-    # Get variation specific pictures (if they exist)
+    # Get variation specific images (if they exist, replaces default image)
     if ( defined $r->{Variations}->{Pictures}->{VariationSpecificPictureSet} ) {
       for my $v ( @{$r->{Variations}->{Pictures}->{VariationSpecificPictureSet}} ) {
-        my $variation = $v->{VariationSpecificValue};
+        my $var       = $v->{VariationSpecificValue};
         my $extimage  = ref( $v->{ExternalPictureURL} ) eq 'ARRAY'  
                         ? $v->{ExternalPictureURL}->[0]
                         : $v->{ExternalPictureURL};
@@ -436,13 +450,12 @@ for my $item_id ( uniq sort @all_items ) {
 
         my $image_url = $extimage || $intimage || $image_url_main;
         
-        #$img_map->{ $variation } = $image_url;
-        $variations->{ $var }->{IMG} = $image_url;
+        $variations->{$var}->{IMG} = $image_url;
       }
     }
 
     # Update Inventory table
-    for my $variation ( keys %$upc_map ) {
+    for my $variation ( keys %$variations ) {
       my $sku       = $variations->{$variation}->{SKU};
       my $image_url = $variations->{$variation}->{IMG};
       my $upc       = $variations->{$variation}->{UPC};
@@ -451,9 +464,9 @@ for my $item_id ( uniq sort @all_items ) {
       if ( $UPDATE ) {
         $sth->execute($item_id, $brand, $sku, $title, $variation, $image_url, $image_url_main,$upc,$weight_oz,$avail_qty) or die "can't execute query: $sql";
       }
-      else {
-        # Display info instead of updating the database
-        print "\n$item_id, $brand, $sku, $title, $variation, $image_url, $image_url_main,$upc,$weight_oz,$avail_qty";
+
+      if ( $outfile ) {
+        $csv->print($ofh, [$item_id, $brand, $sku, $title, $variation, $image_url, $image_url_main,$upc,$weight_oz,$avail_qty]);
       }
 
     }
@@ -464,7 +477,7 @@ for my $item_id ( uniq sort @all_items ) {
     ################################################################################ 
     my $variation = '';
     my $image_url = $image_url_main;
-    my $sku   = $r->{SKU};
+    my $sku       = $r->{SKU};
     my $upc       = get_UPC($r->{ItemSpecifics});
 
     # Get Quantity
@@ -475,9 +488,9 @@ for my $item_id ( uniq sort @all_items ) {
     if ( $UPDATE ) {
       $sth->execute($item_id, $brand, $sku, $title, $variation, $image_url, $image_url_main,$upc,$weight_oz,$avail_qty) or die "can't execute query: $sql";
     }
-    else {
-      # Display info instead of updating the database
-      print "\n$item_id, $brand, $sku, $title, $variation, $image_url, $image_url_main,$upc,$weight_oz,$avail_qty";
+
+    if ( $outfile ) {
+      $csv->print($ofh, [$item_id, $brand, $sku, $title, $variation, $image_url, $image_url_main,$upc,$weight_oz,$avail_qty]);
     }
   }
 
@@ -678,7 +691,7 @@ sub get_Brand {
 		return $s->{Value}; # found Brand
 	}
 
-  return ''; # did not find UPC
+  return ''; # did not find Brand
 }
 
 #TODO: not sure if this is needed
