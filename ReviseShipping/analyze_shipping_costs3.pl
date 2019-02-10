@@ -1,6 +1,44 @@
 #!/usr/bin/perl -w 
 
-# MISC NOTES:
+################################################################################
+# CHANGE lOG
+################################################################################
+#
+# Date        Description
+# 1/20/2019   Initial Create
+
+
+################################################################################
+# DESCRIPTION:
+################################################################################
+#
+#   Compares shipping data from both Ebay and the BTData.Inventory table.
+#
+#   Usage Examples:
+#       analyze_shipping_cost3.pl -a -P      # get list of changes required for all listings
+#       analyze_shipping_cost3.pl -i 12345   # get list of changes required for specific listing
+#       analyze_shipping_cost3.pl -a -r      # NOTE: Revise all lists???
+#       analyze_shipping_cost3.pl -a -m 5    # get list of changes required for first 5 listings
+#
+#   Inputs
+#     BTData.Inventory table              # Inventory meta-data  (cost, storage location, SKU, etc.)
+#     Ebay
+#
+#   Outputs (defaults):
+#     shipping_cost_fix.csv               # ??? 
+#     shipping_cost_fix.noweights.csv     # No Weight. You cannto have calculated shipping with out setting weight on Ebay
+#     shipping_cost_fix.errors.csv        # EbayItemID or Title not in Database, unknown shipping service, etc
+#
+#   TODO:
+#   change -P to be the default?
+#   Does it update Ebay?
+#   Does it update Inventory?
+#   What are the inputs and outputs?
+
+
+################################################################################
+# NOTES:
+################################################################################
 #
 #   Add to shipping program - 
 #     If multiple items are purchased, calculate if it's cheaper to ship two 
@@ -20,34 +58,37 @@ use File::Copy qw(copy move);
 use POSIX;
 use Getopt::Std;
 use Storable 'dclone';
+use Switch;
 
 use lib '../cfg';
 use EbayConfig;
 
 
+################################################################################
+# Process Command Line Options
+################################################################################
 my %opts;
-getopts('i:raDo:m:w:e:P',\%opts);
+getopts('ai:rDm:w:d',\%opts);
 
 # Primary Options:
 # -a    => All items processing
 # -i    => Item id (ebayItemId) of single item to process
 # -r    => Revise item(s) on ebay
-# -P    => Production DB connection
+                                          #       want to test updating the database.
 
 # Misc Options:
-# -o    => Output file - items that need shipping cost fixed
-# -e    => Error file - items without weights
+# -o    => Output file - items that need shipping cost fixed  (Default: shipping_cost_fix.csv) 
+# -e    => Error file  - items without weights                (Default: shipping_cost_fix.noweights.csv)
 # -w    => Weight of single item ( only used with -i )
 # -m    => Max number of items to process (debugging. use with -a)
 # -D    => Debug mode
+# -d    => Dev database connection
 
 my $single_item_id;
 my $process_all_items = 0;
-my $weight_in;
 
 if ( defined $opts{i} ) {
 	$single_item_id = $opts{i};
-	$weight_in = $opts{w} ? $opts{w} : 0;   # Only check -w option if processing a single ebayItemId (-i)
 }
 elsif ( defined $opts{a} ) {
   $process_all_items = 1;
@@ -57,16 +98,17 @@ else {
 }
 
 my $max_items           = defined $opts{m} ? $opts{m} : 0;
-my $REVISE_ITEM         = defined $opts{r} ? 1 : 0;         # TODO: add this functionality below
+my $REVISE_ITEM         = defined $opts{r} ? 1 : 0;                 # TODO: add this functionality below
 my $DEBUG               = defined $opts{D} ? 1 : 0;
-my $outfile             = defined $opts{o} ? $opts{o} : 'shipping_cost_fix.csv';
-$outfile .= '.csv' if ( $outfile !~ /.*\.csv$/i );
-my $noweightfile        = defined $opts{e} ? $opts{e} : 'shipping_cost_fix.noweights.csv';
-$noweightfile .= '.csv' if ( $noweightfile !~ /.*\.csv$/i );
 
-my $errfile = 'shipping_cost_fix.errors.csv';
-my $connect_string = $opts{P} ? 'DBI:ODBC:BTData_PROD_SQLEXPRESS' : 'DBI:ODBC:BTData_DEV_SQLEXPRESS';
+my $connect_string = $opts{d} ? 'DBI:ODBC:BTData_DEV_SQLEXPRESS' : 'DBI:ODBC:BTData_PROD_SQLEXPRESS';  # PROD connection is default
 print STDERR "\n*\n* Connection string: $connect_string\n*\n\n";
+
+my $outfile      = 'shipping_cost_fix.csv';
+my $noweightfile = 'shipping_cost_fix.noweights.csv';
+my $errfile      = 'shipping_cost_fix.errors.csv';
+
+my $shipToLocations = getShipToLocations();
 
 ###################################################
 # EBAY API INFO                                   #
@@ -97,6 +139,12 @@ my $request_getmyebayselling = <<END_XML;
 		<PageNumber>__PAGE_NUMBER__</PageNumber>
 	</Pagination>
 </ActiveList>
+<OutputSelector>TotalNumberOfPages</OutputSelector>
+<OutputSelector>ItemID</OutputSelector>
+<OutputSelector>Title</OutputSelector>
+<OutputSelector>SKU</OutputSelector>
+<OutputSelector>VariationTitle</OutputSelector>
+<OutputSelector>SellingStatus</OutputSelector>
 </GetMyeBaySellingRequest>
 END_XML
 
@@ -152,10 +200,13 @@ END_XML
 #          So, for determining the shipping cost, we'll use the ebay weight OR
 #          the MAX weight found on the database for listing (Title).
 #
+# TODO: are we sure we want to trim the title?
+#       remove max(cost) from title query, since its at the title/variation level?
+#
 my $sql_get_weight = <<END_SQL;
 	select ROW_NUMBER() over(order by a.eBayItemID) as id, a.*
 	  from ( select eBayItemID, ltrim(rtrim(Title)) as title, 
-	              MAX(weight) as weight,
+	                MAX(weight) as weight,
                   MAX(packaged_weight) as packaged_weight,
                   MAX(cost) as cost                  
              from Inventory 
@@ -183,56 +234,56 @@ open my $outfh, '>', $outfile or die "can't open file";
 open my $noweight_fh, '>', $noweightfile or die "can't open file";
 open my $err_fh, '>', $errfile or die "can't open file";
 
+# Write output header row to output file
+print $outfh qq/eBayItemID,Title,Variation,Ebay Weight,DB Packaged Weight,Wholesale Cost,Listing Price,Profit \$,Profit \%,Break Even,10%,20%,30%,40%,50%,60%,70%,80%,90%,100%/;
+print $noweight_fh qq/"eBayItemID","Title"/;
+print $err_fh qq/"eBayItemID","Title","Error Message"\n/;
+
+
+################################################################################
+# Initialize variables
+################################################################################
 my $dbh;
 my ($sth,$sthtv);
-my $items = {};   # all items by row number
-my $itemsid = {}; # all items by EbayItemID
-my $itemst  = {}; # items by title
-my $itemstv = {}; # items by title / variation
+my $items   = {}; # items keys by row number
+my $itemsid = {}; # items keys by EbayItemID
+my $itemst  = {}; # items keys by title (for weight)
+my $itemstv = {}; # items keys by title / variation (for cost)
 
 
 ########################################################################################
-# Get Item info from Database (Cost/Weights)
+# Get Item info from Database (Cost/Weights) - build lookup hashes
 ########################################################################################
-if ( $single_item_id && $weight_in ) {
-	# short cut, if the user is only processing one item and has provide the weight
-	#            also a way around not having access to the database when testing
-  for my $i ( split(',',$single_item_id) ) {
-	  $items->{$i}->{weight} = $weight_in;
-  }
+# Open database connection
+$dbh = DBI->connect( $connect_string, 'shipit', 'shipit',
+              { 
+                RaiseError       => 0, 
+                AutoCommit       => 1, 
+                FetchHashKeyName => 'NAME_lc',
+                LongReadLen      => 32768,
+              } 
+            )
+    || die "\n\nDatabase connection not made: $DBI::errstr\n\n";
+
+# Get WEIGHTS from the Inventory table by TITLE
+$sth = $dbh->prepare( $sql_get_weight ) or die "can't prepare stmt";
+$sth->execute() or die "can't execute stmt";
+$items = $sth->fetchall_hashref('id') or die "can't fetch results";						
+
+# Create title lookups, and ebayitemid lookup
+for my $id ( keys %$items ) {
+  $itemsid->{ $items->{$id}->{ebayitemid} } = $items->{$id};
+  $itemst->{ $items->{$id}->{title} } = $items->{$id};
 }
-else {
-		# Open database connection
-		$dbh = DBI->connect( $connect_string, 'shipit', 'shipit',
-									{ 
-										RaiseError       => 0, 
-										AutoCommit       => 1, 
-										FetchHashKeyName => 'NAME_lc',
-										LongReadLen      => 32768,
-									} 
-							  )
-		    || die "\n\nDatabase connection not made: $DBI::errstr\n\n";
 
-	# Get all item weights from the Inventory table by TITLE
-	$sth = $dbh->prepare( $sql_get_weight ) or die "can't prepare stmt";
-	$sth->execute() or die "can't execute stmt";
-	$items = $sth->fetchall_hashref('id') or die "can't fetch results";						
+# Get COSTS from the Inventory table by TITLE+VARIATION
+$sthtv = $dbh->prepare( $sql_get_cost ) or die "can't prepare stmt";
+$sthtv->execute() or die "can't execute stmt";
+$items = $sthtv->fetchall_hashref('id') or die "can't fetch results";						
 
-  # Create title lookup, and ebayitemid lookup
-  for my $id ( keys %$items ) {
-    $itemsid->{ $items->{$id}->{ebayitemid} } = $items->{$id};
-    $itemst->{ $items->{$id}->{title} } = $items->{$id};
-  }
-
-	# Get all item costs from the Inventory table by TITLE+VARIATION
-	$sthtv = $dbh->prepare( $sql_get_cost ) or die "can't prepare stmt";
-	$sthtv->execute() or die "can't execute stmt";
-	$items = $sthtv->fetchall_hashref('id') or die "can't fetch results";						
-
-  # Create title / variation lookup, and ebayitemid lookup
-  for my $id ( keys %$items ) {
-    $itemstv->{ $items->{$id}->{title} }->{ $items->{$id}->{variation} } = $items->{$id};
-  }
+# Create title / variation lookup, and ebayitemid lookup
+for my $id ( keys %$items ) {
+  $itemstv->{ $items->{$id}->{title} }->{ $items->{$id}->{variation} } = $items->{$id};
 }
 
 # NOTE: Lookup tables are:
@@ -247,10 +298,14 @@ else {
 my $response_hash;
 my $request;
 my %all_shipping_profiles;
+my %new_shipping_profiles;
+
 
 ################################################################################
 # Get all Ebay flat rate shipping discount profiles
 ################################################################################
+# NOTE: We still need this for International shipping
+#
 $header->remove_header('X-EBAY-API-CALL-NAME');
 $header->push_header('X-EBAY-API-CALL-NAME' => 'GetShippingDiscountProfiles');
 $request = $request_GetShippingDiscountProfiles;
@@ -259,34 +314,32 @@ $response_hash = submit_request( $request, $header );
 my $FlatShippingDiscount = $response_hash->{FlatShippingDiscount}->{DiscountProfile};
 
 if ( ! $FlatShippingDiscount ) {
-  print "\n\nWARNING: Could not get shipping discount profiles!!!\n";
-  exit;
+  die "\n\nWARNING: Could not get shipping discount profiles!!!";
 }
 else {
   for my $sp ( sort @{$FlatShippingDiscount} ) {
     my $key =  sprintf( "%0.2f", $sp->{EachAdditionalAmount} ); 
 
-    # get rid of duplicate dicount profiles, only keep the ones that are in the right format 
-    if ( $sp->{DiscountProfileName} =~ / /  or $sp->{DiscountProfileName} =~ /cent/ or $sp->{DiscountProfileName} =~ /add_\.95_addl/) {
-      #print "\nSkipping $sp->{DiscountProfileName}";
-      next;
-    };
+    $all_shipping_profiles{ $sp->{DiscountProfileID} } = $sp;
 
-    if ( exists $all_shipping_profiles{ "$key" } ) {
-      print "\n",Dumper($sp);
-      print Dumper($all_shipping_profiles{ "$key" });
-      die "$key - discount profile already exists";
+    # TODO: dump discount profiles that need to be deleted
+    next if $sp->{DiscountProfileName} !~ /addl/;
+    next if $sp->{DiscountProfileName} =~ /cents/;
+    next if $sp->{DiscountProfileName} =~ /\s+/g;
+    next if $sp->{DiscountProfileName} =~ /add_\.95_addl/;
+
+    if ( exists $new_shipping_profiles{ "$key" } ) {
+      warn "$key - discount profile already exists";
+      print "\n1st: ",Dumper($new_shipping_profiles{$key});
+      print "\n2st: ",Dumper($sp);
     }
 
-    $all_shipping_profiles{ "$key" }->{EachAdditionalAmount} = $sp->{EachAdditionalAmount};
-    $all_shipping_profiles{ "$key" }->{DiscountProfileName} = $sp->{DiscountProfileName};
-    $all_shipping_profiles{ "$key" }->{DiscountProfileID} = $sp->{DiscountProfileID};
+    $new_shipping_profiles{ "$key" } = $sp;
   }
 }
+# print Dumper(\%all_shipping_profiles);
+# print Dumper(\%new_shipping_profiles); exit;
 
-# for my $k ( sort keys %all_shipping_profiles ) {
-#   print "\n$all_shipping_profiles{$k}->{DiscountProfileName}";
-# }
 
 ################################################################################
 # GET LIST OF ACTIVE ITEM_ID's *** FROM EBAY ***
@@ -303,30 +356,35 @@ if ( $process_all_items ) {
 		$request = $request_getmyebayselling;
 		$request =~ s/__PAGE_NUMBER__/$pagenumber/;
 		$response_hash = submit_request( $request, $header );
-		for my $i ( @{$response_hash->{ActiveList}->{ItemArray}->{Item}} ) {
-			push(@all_items, $i->{ItemID});
-		}
+
+    # Handle paging
 		if ($pagenumber==1) {
 			$maxpages = $response_hash->{ActiveList}->{PaginationResult}->{TotalNumberOfPages};
 		}
+    print "\npage $pagenumber of $maxpages";
 		$pagenumber++;
+
+    # Active Items
+		for my $i ( @{$response_hash->{ActiveList}->{ItemArray}->{Item}} ) {
+      # Exclude foreign listings by currency (not perfect, some other countries could use USD)
+      # But, by doing a check here, we avoid a lot of extra API calls later 
+      next if ($i->{SellingStatus}->{CurrentPrice}->{currencyID} ne 'USD');
+
+			push(@all_items, $i->{ItemID});
+		}
 	}
 }
 else {
 	@all_items = split(',',$single_item_id);
 }
-print STDERR "Total Items: ",scalar @all_items,"\n";
 
-# Write output header row to output file
-print $outfh qq/eBayItemID,Title,Variation,Weight,Wholesale Cost,Shipping Cost,Listing Price,Profit-Loss,Break Even,10%,20%,30%,40%,50%,60%,70%,80%,90%,100%/;
-print $noweight_fh qq/"eBayItemID","Title"/;
-print $err_fh qq/"eBayItemID","Title","Error Message"\n/;
+print STDERR "Total Items: ",scalar @all_items,"\n";
 
 
 ################################################################################
 #                                                                              #
 #                                                                              #
-#                 Loop over each item_id from Ebay                             #
+#                   Process each item_id from Ebay                             #
 #                                                                              #
 #                                                                              #
 ################################################################################
@@ -334,7 +392,6 @@ my $item_count=0;
 for my $item_id ( @all_items ) {
 
 	$item_count++;
-	# GET SINGLE ITEM DETAILS - EBAY API 'GetItem' call
 	$request = $request_getitem_default;
 	$request =~ s/__ItemID__/$item_id/;
 	$header->remove_header('X-EBAY-API-CALL-NAME');
@@ -342,278 +399,388 @@ for my $item_id ( @all_items ) {
 	$response_hash = submit_request( $request, $header );
 
 	my $r = $response_hash->{Item};
-	my $title  = $r->{Title};           # TODO: trim title?  We are trimming title from database.
+	my $title  = $r->{Title};           # NOTE: We are trimming title in the database too
   $title =~ s/^\s+//g;
   $title =~ s/\s+$//g;
 
-  # print Dumper($r); exit;
+  my $db_total_ozs = 'n/a';
+  my $db_total_item_ozs = 'n/a';
+  my $db_total_packaged_ozs = 'n/a';
 
-  ################################################################################ 
-  # Must be in database to get COST  (fyi- cost is at the variation level)
+  # Warn if itemID not in database (fyi- cost is at the variation level)
 	if ( ! defined $itemsid->{$item_id} ) {
     print $err_fh qq($item_id,$title,"WARNING [1]: ITEM ID not in database"\n);
-    #next;
+  }
+  else {
+    # Get weight from database
+    $db_total_item_ozs = $itemsid->{$item_id}->{weight};
+    $db_total_packaged_ozs = $itemsid->{$item_id}->{packaged_weight} || $db_total_item_ozs;   # use weight if packaged weight is not defined
   }
 
+  # Warn if title not in database
 	if ( ! defined $itemst->{$title} ) {
     print $err_fh qq($item_id,$title,"WARNING [2]: TITLE not in database"\n);
-    #next;
   }
 
-  ################################################################################ 
   # Get weight from Ebay first (if defined and weight is positive)
+  #
+  # TODO: UPDATE Ebay with PACKAGED_WEIGHT ($db_total_packaged_ozs)
+  #
   my $lbs = defined $r->{ShippingPackageDetails}->{WeightMajor}->{content} ? int($r->{ShippingPackageDetails}->{WeightMajor}->{content}) : 0;
-  my $ozs = defined $r->{ShippingPackageDetails}->{WeightMinor}->{content} ? int($r->{ShippingPackageDetails}->{WeightMinor}->{content}) : 0;
-  $ozs = ( $lbs * 16 ) + $ozs;
+  my $oz = defined $r->{ShippingPackageDetails}->{WeightMinor}->{content} ? int($r->{ShippingPackageDetails}->{WeightMinor}->{content}) : 0;
+  my $ebay_total_ozs = ( $lbs * 16 ) + $oz;
 
-  # Get weight from database
-	if ( ! $ozs && defined $itemst->{$title} && $itemsid->{$item_id} ) {
-	  $ozs = int($items->{$item_id}->{weight}||'0');
-	}
-
-	if ( ! $ozs ) {
+  # NOTE: Let it throw error if the weight is not on ebay
+	if ( ! $ebay_total_ozs ) {
 		print STDERR "\nITEM ID: '$item_id' - TITLE: '$title' -- no weight";
 		print $noweight_fh "\n$item_id,$title";
-		#next; --> NOTE: moved this down by revise item, to give the item the opportunity to fall out also due to not having intl. shipping info
+		next; # NOTE: Ignoring the existing note about letting it continue. We don't want to continue if there's no weight, 
+          #       because Calculated Shipping can't be set with out weight
+          #       OLDNOTE: moved this down by revise item, to give the item the opportunity to fall out also due to not having intl. shipping info
 	}
 
   ################################################################################ 
 	# Get Ebay Shipping info - mailclass/price
+  ################################################################################ 
 	my $spd = $r->{ShippingPackageDetails};
 	my $sd  = $r->{ShippingDetails};
 	my $shipping_details = dclone($sd);
 
 
   #################################################################################
-	# INTERNATIONAL SHIPPING SERVICES
-  #################################################################################
-  my $curr_intl_ipa_row_cost=0;
-  my $curr_intl_ipa_row_addl=0;
-  my $curr_intl_ipa_ca_cost=0;
-  my $curr_intl_ipa_ca_addl=0;
-  my $curr_intl_dp_addl_cost=0;
-  my $curr_intl_dp_name;
-
-	my $addl_item_cost=0;
-	my $addl_item_cost_profile;
-	my $new_cost_row=0;
-	my $new_cost_ca=0;
-
-  my $new_intl_ipa_row_cost=0;
-  my $new_intl_ipa_row_addl=0;
-  my $new_intl_ipa_ca_cost=0;
-  my $new_intl_ipa_ca_addl=0;
-  my $new_intl_epacket_row_cost=0;
-  my $new_intl_epacket_row_addl=0;
-  my $new_intl_epacket_ca_cost=0;
-  my $new_intl_epacket_ca_addl=0;
-  my $new_intl_dp_addl_cost=0;
-  my $new_intl_dp_name;
-
-	if ( defined $sd->{InternationalShippingServiceOption} ) { # this is optional
-
-    # Get Current shipping costs
-    my $isso = $sd->{InternationalShippingServiceOption};
-
-    for my $sso ( @$isso ) {
-
-      #die "\nERROR: Unknown International shipping service: ",Dumper($isso) 
-      if ( $sso->{ShippingService} ne 'OtherInternational' ) {
-	      print $err_fh qq/$item_id,"$title","warning: unhandled INTL shipping service '/,$sso->{ShippingService},qq/'"/;
-        next;
-      }
-
-      if ( $sso->{ShipToLocation}->[0] eq 'CA' ) {
-		    $curr_intl_ipa_ca_cost = $sso->{ShippingServiceCost}->{content};
-		    $curr_intl_ipa_ca_addl = sprintf("%0.2f",$sso->{ShippingServiceAdditionalCost}->{content});
-        die unless $curr_intl_ipa_ca_cost;
-      }
-      elsif (  $sso->{ShipToLocation}->[0] eq 'Worldwide' ) {
-
-		    $curr_intl_ipa_row_cost = $sso->{ShippingServiceCost}->{content};
-		    $curr_intl_ipa_row_addl = sprintf("%0.2f",$sso->{ShippingServiceAdditionalCost}->{content});
-      }
-      else {
-        die "\nERROR: Unknown International shipping location: ",Dumper($isso); 
-      }
-
-    }
-
-    # Get Current discount profile info
-    if ( defined $sd->{InternationalFlatShippingDiscount} ) {
-      $curr_intl_dp_addl_cost = sprintf("%0.2f",$sd->{InternationalFlatShippingDiscount}->{DiscountProfile}->{EachAdditionalAmount}->{content});
-      $curr_intl_dp_name = $sd->{InternationalFlatShippingDiscount}->{DiscountProfile}->{DiscountProfileName};
-    }
-
-
-#     # Get addl_item_cost_profile
-# 		my $addl_item_cost_string = sprintf("%0.2f", $addl_item_cost );
-#     $curr_intl_dp_addl_cost = $addl_item_cost_string;
-#     if ( defined $all_shipping_profiles{ $addl_item_cost_string } ) { 
-# 			$addl_item_cost_profile = $all_shipping_profiles{ $addl_item_cost_string };
-#       $curr_intl_dp_name = $addl_item_cost_profile->{DiscountProfileName};
-# 		} else {
-# 			print STDERR "\nWARNING: NO SHIPPING PROFILE FOUND FOR COST '$addl_item_cost_string'";
-# 			print STDERR "\n  ($item_id) $title\n";
-# 			print $err_fh qq/$item_id,"$title","No shipping profile for cost '$addl_item_cost_string'"\n/;
-# 			next;
-# 		}
-
-    # Get NEW International shipping values
-    $new_intl_ipa_row_cost = get_intl_ipa_row_cost( $ozs );
-    $new_intl_ipa_row_addl = get_intl_ipa_row_addl( $ozs );
-    $new_intl_ipa_ca_cost = get_intl_ipa_ca_cost( $ozs );
-    $new_intl_ipa_ca_addl = get_intl_ipa_ca_addl( $ozs );
-
-    $new_intl_epacket_row_cost = get_intl_epacket_row_cost( $ozs );
-    $new_intl_epacket_row_addl = get_intl_epacket_row_addl( $ozs );
-    $new_intl_epacket_ca_cost = get_intl_epacket_ca_cost( $ozs );
-    $new_intl_epacket_ca_addl = get_intl_epacket_ca_addl( $ozs );
-
-    $new_intl_dp_addl_cost = 0;                 # free domestic shipping on all products
-    $new_intl_dp_name      = 'add_0.00_addl';   # free domestic shipping on all products
-
-    # Update Shipping Details hash
-		$sd->{InternationalShippingDiscountProfileID} = $addl_item_cost_profile->{DiscountProfileID};
-    $sd->{InternationalFlatShippingDiscount} = 
-																			{
-                                       'DiscountName'    => 'EachAdditionalAmount',
-                                       'DiscountProfile' => {
-                                                            'DiscountProfileID' => $addl_item_cost_profile->{DiscountProfileID},
-                                                            'DiscountProfileName' => $addl_item_cost_profile->{DiscountProfileName},
-                                                            'EachAdditionalAmount' => [ "$addl_item_cost" ]
-                                                            }
-                                     };
-		
-
-    $sd->{InternationalShippingServiceOption} = [
-                                        {
-                                          'ShipToLocation' => [ 'Worldwide' ],
-                                          'ShippingService' => 'OtherInternational',
-                                          'ShippingServiceAdditionalCost' => [ $addl_item_cost ],
-                                          'ShippingServiceCost' => [ "$new_cost_row" ],
-                                          'ShippingServicePriority' => '1'
-                                        },
-                                        {
-                                          'ShipToLocation' => [ 'CA' ],
-                                          'ShippingService' => 'OtherInternational',
-                                          'ShippingServiceAdditionalCost' => [ $addl_item_cost ],
-                                          'ShippingServiceCost' => [ "$new_cost_ca" ],
-                                          'ShippingServicePriority' => '2'
-                                        },
-                                      ];
-
-	}
-	else {
-		# No international shipping specified
-		#print STDERR Dumper($r);
-	  print STDERR "\nWARNING: NO INTL SHIPPING INFORMATION IN LISTING";
-		print STDERR "\n  ($item_id) $title\n";
-
-	  print $err_fh qq/$item_id,"$title","No International shipping info (calculated weight?)"\n/;
-		next;
-	}
-
-  next if ( ! $ozs );  # skip this record if we couldn't find a weight (message already printed above)
-
-
-  #################################################################################
   # DOMESTIC SHIPPING
   #################################################################################
-  my $curr_dom_dp_addl_cost;
-  my $curr_dom_dp_name;
   my $curr_dom_first_cost;
   my $curr_dom_first_addl;
   my $curr_dom_priority_cost;
   my $curr_dom_priority_addl;
 
-  # Current Discount Profile Additional Cost
-	$curr_dom_dp_addl_cost = $sd->{FlatShippingDiscount}->{DiscountProfile}->{EachAdditionalAmount}->{content} || '0';
-	my $curr_dom_addl_item_cost_string = sprintf("%0.2f", $curr_dom_dp_addl_cost );
-
-  # Current Discount Profile Name
-	my $curr_dom_addl_item_cost_profile = $all_shipping_profiles{ $curr_dom_addl_item_cost_string };
-  die "\nWARNING: No profile exists for '$curr_dom_addl_item_cost_string'"
-    if ( ! defined $all_shipping_profiles{ $curr_dom_addl_item_cost_string } );
-  $curr_dom_dp_name = $curr_dom_addl_item_cost_profile->{DiscountProfileName};
-
-  # Get actual shiiping costs for domestic first class
-  my $actual_dom_first_cost = get_dom_first_cost( $ozs );
-  my $actual_dom_priority_cost = get_dom_priority_cost( $ozs );
-
-  # Get NEW domestic shipping values  (free domestic 1st class shipping on all products)
-  my $new_dom_first_cost = $ozs>16 ? undef : 0;                   
-  my $new_dom_first_addl = $ozs>16 ? undef : 0;
-  my $new_dom_priority_cost = get_dom_priority_cost( $ozs );
-  my $new_dom_priority_addl = get_dom_priority_addl( $ozs );  # always 0
-  my $new_dom_dp_addl_cost = 0;               
-  my $new_dom_dp_name      = 'add_0.00_addl';
-
-  # Back out shipping cost already built in to the price
-  # If first class shipping is offered, then subtract the FC price, 
-  # else if only priority is offered, then set priority to free (because it will be built into the price of the item)
-  if ( defined $actual_dom_first_cost ) {
-    # Domestic
-    $new_dom_priority_cost -= $actual_dom_first_cost;
-    # INTL
-    $new_intl_ipa_row_cost -= $actual_dom_first_cost;
-    $new_intl_epacket_row_cost -= $actual_dom_first_cost;
-    $new_intl_ipa_ca_cost -= $actual_dom_first_cost;
-    $new_intl_epacket_ca_cost -= $actual_dom_first_cost;
-  }
-  else {
-    # Domestic (Priority ONLY)
-    $new_dom_priority_cost = 0;
-    $new_dom_priority_addl = 0;
-
-    # INTL
-    $new_intl_ipa_row_cost -= $actual_dom_priority_cost;
-    $new_intl_epacket_row_cost -= $actual_dom_priority_cost;
-    $new_intl_ipa_ca_cost -= $actual_dom_priority_cost;
-    $new_intl_epacket_ca_cost -= $actual_dom_priority_cost;
+  # Current Discount Profile
+  my ($curr_dom_dp_id, $curr_dom_dp_name, $curr_dom_dp_addl_cost) = ('','','');
+  if ( defined $sd->{FlatShippingDiscount}->{DiscountProfile} ) {
+    $curr_dom_dp_id = $sd->{FlatShippingDiscount}->{DiscountProfile}->{DiscountPofileID};
+    $curr_dom_dp_name = $all_shipping_profiles{ $curr_dom_dp_id }->{DiscountProfileName};
+	  $curr_dom_dp_addl_cost = $sd->{FlatShippingDiscount}->{DiscountProfile}->{EachAdditionalAmount}->{content} || '0';
   }
 
-	# FIX CONTENT TAGS (before revising item -- probably wouldn't have to do this if we XMLin'd with different options)
-	delete $sd->{CalculatedShippingRate};
+  # Calculated Shipping 
+  my $packageDepth  = defined $r->{ShippingPackageDetails}->{PackageDepth}->{content} ? $r->{ShippingPackageDetails}->{PackageDepth}->{content} : '4' ;
+  my $packageLength = defined $r->{ShippingPackageDetails}->{PackageLength}->{content} ? $r->{ShippingPackageDetails}->{PackageLength}->{content} : '6' ;
+  my $packageWidth  = defined $r->{ShippingPackageDetails}->{PackageWidth}->{content} ? $r->{ShippingPackageDetails}->{PackageWidth}->{content} : '4' ;
+  
+  $sd->{CalculatedShippingRate} = {
+      'OriginatingPostalCode' => '60506',
+      'PackageDepth' => {
+        'content' => $packageDepth,
+        'measurementSystem' => 'English',
+        'unit' => 'inches'
+      },
+      'PackageLength' => {
+        'content' => $packageLength,
+        'measurementSystem' => 'English',
+        'unit' => 'inches'
+      },
+      'PackageWidth' => {
+        'content' => $packageWidth,
+        'measurementSystem' => 'English',
+        'unit' => 'inches'
+      },
+      'PackagingHandlingCosts' => {
+        'content' => '0.0',
+        'currencyID' => 'USD'
+      },
+      'ShippingIrregular' => 'false',
+      'ShippingPackage' => 'PackageThickEnvelope',
+      'WeightMajor' => {
+        'content' => $lbs,
+        'measurementSystem' => 'English',
+        'unit' => 'lbs'
+      },
+      'WeightMinor' => {
+        'content' => $oz,
+        'measurementSystem' => 'English',
+        'unit' => 'oz'
+      }
+    };
 
-  # Update xml with new domestic shipping service options (sso)
-	for my $sso ( @{ $sd->{ShippingServiceOptions} } ) {
+    delete $sd->{ExcludeShipToLocation};
+#     push( @{$sd->{ExcludeShipToLocation}}, (
+#       'Africa',
+#       'South America',
+#       'BN',
+#       'KH',
+#       'ID',
+#       'LA',
+#       'MO',
+#       'PH',
+#       'TW',
+#       'TH',
+#       'VN',
+#       'BM',
+#       'GL',
+#       'MX',
+#       'PM',
+#       'BH',
+#       'IQ',
+#       'JO',
+#       'KW',
+#       'LB',
+#       'OM',
+#       'QA',
+#       'SA',
+#       'TR',
+#       'AE',
+#       'YE',
+#       'AF',
+#       'AM',
+#       'AZ',
+#       'BD',
+#       'BT',
+#       'CN',
+#       'GE',
+#       'IN',
+#       'KZ',
+#       'KR',
+#       'KG',
+#       'MV',
+#       'MN',
+#       'NP',
+#       'PK',
+#       'RU',
+#       'LK',
+#       'TJ',
+#       'TM',
+#       'UZ',
+#       'AS',
+#       'CK',
+#       'FJ',
+#       'PF',
+#       'GU',
+#       'KI',
+#       'MH',
+#       'FM',
+#       'NR',
+#       'NC',
+#       'NU',
+#       'PW',
+#       'PG',
+#       'SB',
+#       'TO',
+#       'TV',
+#       'VU',
+#       'WF',
+#       'WS',
+#       'AL',
+#       'AD',
+#       'AT',
+#       'BE',
+#       'BA',
+#       'BG',
+#       'CY',
+#       'CZ',
+#       'GR',
+#       'GG',
+#       'IS',
+#       'JE',
+#       'LI',
+#       'MK',
+#       'MD',
+#       'MC',
+#       'ME',
+#       'PL',
+#       'RO',
+#       'SM',
+#       'RS',
+#       'SK',
+#       'SI',
+#       'SJ',
+#       'UA',
+#       'VA',
+#       'AI',
+#       'AG',
+#       'AW',
+#       'BS',
+#       'BB',
+#       'BZ',
+#       'VG',
+#       'KY',
+#       'CR',
+#       'DM',
+#       'DO',
+#       'SV',
+#       'GD',
+#       'GP',
+#       'GT',
+#       'HT',
+#       'HN',
+#       'JM',
+#       'MQ',
+#       'MS',
+#       'AN',
+#       'NI',
+#       'PA',
+#       'KN',
+#       'LC',
+#       'VC',
+#       'TT',
+#       'TC') 
+#     );
+
+  # Delete Flat Rate Shipping Discount 
+  delete $sd->{FlatShippingDiscount};
+
+  # Current shipping services costs
+  my $elems = @{$sd->{ShippingServiceOptions}};
+  for ( my $idx=0 ; $idx < $elems; $idx++ ) {
+    my $sso = $sd->{ShippingServiceOptions}->[$idx];
 		my $sso_ss_cost = $sso->{ShippingServiceCost}->{content} || '0';
 		$sso->{ShippingServiceCost} = $sso_ss_cost;
 
 		my $sso_ss_addl_cost = $sso->{ShippingServiceAdditionalCost}->{content} || '0';
 		$sso->{ShippingServiceAdditionalCost} = $sso_ss_addl_cost;
 
+    # First class
     if ( $sso->{ShippingService} eq 'USPSFirstClass' ) {
       $curr_dom_first_cost = $sso_ss_cost;
       $curr_dom_first_addl = $sso_ss_addl_cost;
     }
 
+    # Priority
     if ( $sso->{ShippingService} eq 'USPSPriority' ) {
       $curr_dom_priority_cost = $sso_ss_cost;
       $curr_dom_priority_addl = $sso_ss_addl_cost;
     }
 	}
 
-	$sd->{FlatShippingDiscount}->{DiscountProfile}->{EachAdditionalAmount} = sprintf("%.2f",$new_dom_dp_addl_cost);
+  # Set domestic shipping service options (sso) to first class or priority based on weight
+  $sd->{ShippingServiceOptions} = [];
+  if ( $ebay_total_ozs < 16 ) {
+    # First Class
+    my $first_class = {
+        'ExpeditedService' => 'false',
+        'ShippingService' => 'USPSFirstClass',
+        'ShippingServicePriority' => '1',
+        'ShippingTimeMax' => '3',
+        'ShippingTimeMin' => '2'
+    };
+    push( @{$sd->{ShippingServiceOptions}}, $first_class);
+  }
+  else {
+    # Priority
+    my $priority = {
+      'ExpeditedService' => 'false',
+      'ShippingService' => 'USPSPriority',
+      'ShippingServicePriority' => '1',
+      'ShippingTimeMax' => '3',
+      'ShippingTimeMin' => '1'
+    };
+    push( @{$sd->{ShippingServiceOptions}}, $priority);
+  }
+
+  # Estimate Calculated Shipping (needed to estimate profit/loss due to final values fee being charged on shipping)
+  my $new_dom_calc_shipping_cost = get_dom_calc_shipping_cost( $ebay_total_ozs );
+
+
+  #################################################################################
+	# INTERNATIONAL SHIPPING SERVICES
+  #################################################################################
+  my $curr_intl_row_cost=0;
+  my $curr_intl_row_addl=0;
+  my $curr_intl_dp_addl_cost=0;
+  my $curr_intl_dp_name;
+
+  my $new_intl_epacket_row_cost=0;
+  my $new_intl_epacket_row_addl=0;
+  my $idp;                              # New International Discount Profile
+
+  # Current International shipping info (Optional)
+	if ( defined $sd->{InternationalShippingServiceOption} ) { # this is optional
+
+    # Current International shipping costs (OtherInternational / WorldWide (i.e. "Economy", e.g. IPA/E-Packet) )
+    for my $sso ( @{$sd->{InternationalShippingServiceOption}}  ) {
+      if ( $sso->{ShippingService} eq 'OtherInternational' ) {
+        $curr_intl_row_cost = $sso->{ShippingServiceCost}->{content};
+        $curr_intl_row_addl = sprintf("%0.2f",$sso->{ShippingServiceAdditionalCost}->{content});
+      }
+    }
+
+    # Get Current International Discount Profile
+    if ( defined $sd->{InternationalFlatShippingDiscount} ) {
+      $curr_intl_dp_addl_cost = sprintf("%0.2f",$sd->{InternationalFlatShippingDiscount}->{DiscountProfile}->{EachAdditionalAmount}->{content});
+      $curr_intl_dp_name = $sd->{InternationalFlatShippingDiscount}->{DiscountProfile}->{DiscountProfileName};
+    }
+	}
+
+  # NEW International shipping values ( If package <= 4 lbs (64 ozs) )
+  if ( $ebay_total_ozs <= 64 ) {
+    $new_intl_epacket_row_cost = get_intl_epacket_row_cost( $ebay_total_ozs );
+    $new_intl_epacket_row_addl = get_intl_epacket_row_addl( $ebay_total_ozs );
+
+    # NEW International Discount Profile
+    if ( defined $new_shipping_profiles{ $new_intl_epacket_row_addl } ) {
+      $idp = $new_shipping_profiles{ $new_intl_epacket_row_addl };
+    }
+    else {
+      die "Error: Missing Discount Profile for amount: $new_intl_epacket_row_addl";
+    }
+
+    # Set New values
+    $sd->{InternationalFlatShippingDiscount} = 
+    {
+      'DiscountName'    => 'EachAdditionalAmount',
+      'DiscountProfile' => {
+        'DiscountProfileID'   => $idp->{DiscountProfileID},
+        'DiscountProfileName' => $idp->{DiscountProfileName},
+        #'EachAdditionalAmount' => [ "$addl_item_cost" ]    # TODO: why is this an array????
+        'EachAdditionalAmount' => {
+          'content' => $idp->{EachAdditionalAmount},
+          'currencyID' => 'USD'
+        }
+      }
+    };
+
+    $sd->{InternationalShippingDiscountProfileID} = $idp->{DiscountProfileID};
+
+    $sd->{InternationalShippingServiceOption} = [
+                                        {
+                                          'ShipToLocation' => $shipToLocations,   # ePacket only
+                                          'ShippingService' => 'OtherInternational',
+                                          'ShippingServiceAdditionalCost' => [ "$new_intl_epacket_row_addl" ],
+                                          'ShippingServiceCost' => [ "$new_intl_epacket_row_cost" ],
+                                          'ShippingServicePriority' => '1'
+                                        },
+                                      ];
+
+  }
+  else {
+    delete $sd->{InternationalFlatShippingDiscount};
+    delete $sd->{InternationalShippingDiscountProfileID};
+    delete $sd->{InternationalShippingServiceOption};
+  }
+
+  $sd->{PaymentInstructions} = 'Thanks for shopping at The Teaching Toy Box!';
+  $sd->{ShippingType} = 'CalculatedDomesticFlatInternational';
+  $sd->{ShippingDiscountProfileID} = '0';
 
 	# Convert the hash into XML
   my $shipping_details_xml = XMLout($sd, NoAttr=>1, RootName=>'ShippingDetails', KeyAttr=>{});
-  use warnings;
 
   # Debug the XML before revising item
-#		print "\n\nShippingDetails:\n",Dumper($sd);
-#		print "\n\nShipping Details XML:\n",Dumper($shipping_details_xml);
+	#print "\n\nShippingDetails:\n",Dumper($sd);
+	#print "\n\nShipping Details XML:\n",Dumper($shipping_details_xml);
+  
 
   ################################################################################ 
-  # Get Cost / Purchase Price
+  # Get Cost / Purchase Price / Calculate Profit or Loss
   ################################################################################ 
   my $cost = 0;
   my $list = 0;
   my $recommended_list = [];
-  my $profit_loss = 0;
+  my $profit_amt = 0;
   my $var_cost = {};
+
   if ( defined $r->{Variations} ) {
+    # Variations
     for my $v ( @{$r->{Variations}->{Variation}} ) {
 
       my $var = $v->{VariationSpecifics}->{NameValueList}->{Value};
@@ -625,7 +792,6 @@ for my $item_id ( @all_items ) {
 
       $var_cost->{$var}->{list} = $v->{StartPrice}->{content};
 
-      # Does each variation have it's own cost?
       $cost = $itemstv->{$title}->{$var}->{cost};
 
       if ( ! $cost ) {
@@ -636,16 +802,16 @@ for my $item_id ( @all_items ) {
       $var_cost->{$var}->{cost} = $cost;
 
       for (my $perc=0; $perc<=100; $perc+=10 ) {
-        $var_cost->{$var}->{recommended_list}->[$perc] = sprintf("%.2f", ( (($perc/100)*$cost) + $cost + $actual_dom_first_cost + .30 + .25) / .901 );
+        $var_cost->{$var}->{recommended_list}->[$perc] = getListPrice($perc);
       }
 
-      $var_cost->{$var}->{profit_loss} = sprintf( "%.2f", ($var_cost->{$var}->{list} * .901) - $cost - $actual_dom_first_cost - .55) ;
+      $var_cost->{$var}->{profit_amt} = sprintf( "%.2f", ($var_cost->{$var}->{list} * .901) - $cost - .55) ;
     }
   }
   else {
     # Non-Variation
-    $cost = $itemstv->{$title}->{''}->{cost};
-    $list = $r->{StartPrice}->{content};
+    $cost = $itemstv->{$title}->{''}->{cost};     # wholesale cost (purchase price)
+    $list = $r->{StartPrice}->{content};          # listed price on ebay (selling it for this price)
 
     if ( ! $cost ) {
       no warnings;
@@ -655,10 +821,13 @@ for my $item_id ( @all_items ) {
     }
 
     for (my $perc=0; $perc<=100; $perc+=10 ) {
-      $recommended_list->[$perc] = sprintf("%.2f", ( (($perc/100)*$cost) + $cost + $actual_dom_first_cost + .30 + .25) / .901);
+      $recommended_list->[$perc] = getListPrice($perc);
     }
 
-    $profit_loss = sprintf("%.2f", (($list * .901) - $cost - $actual_dom_first_cost - .55)  );
+    # Calculate profit/loss
+    # new_dom_calc_shipping_cost
+    $profit_amt = getProfitAmount($list,$cost);  # Pass current list price and wholesale cost. 
+    $profit_amt = sprintf("%.2f", (($list * .901) - $cost - .55)  );
   }
 
   ################################################################################ 
@@ -666,8 +835,6 @@ for my $item_id ( @all_items ) {
   ################################################################################ 
   $curr_dom_first_cost = 'n/a' unless defined $curr_dom_first_cost;
   $curr_dom_first_addl = 'n/a' unless defined $curr_dom_first_addl;
-  $actual_dom_first_cost = 'n/a' unless defined $actual_dom_first_cost;
-  $new_dom_first_addl = 'n/a' unless defined $new_dom_first_addl;
 
   if ( $DEBUG ) {
     print <<END;
@@ -675,7 +842,7 @@ Item
 ------------------------------------------------
   Title          : $title
   Ebay Item ID   : $item_id
-  Weight (oz)    : $ozs
+  Weight (oz)    : $ebay_total_ozs
 END
 
     if ( ! defined $r->{Variations} ) {
@@ -709,7 +876,8 @@ END
   if ( $DEBUG ) {
     print <<END;
 
-Shipping Info
+------------------------------------------------
+--            Shipping Info                   --
 ------------------------------------------------
 
 Domestic - CURRENT
@@ -721,55 +889,37 @@ Domestic - CURRENT
   Discount Profile Amount : $curr_dom_dp_addl_cost
   Discount Profile Name   : $curr_dom_dp_name
 
-Domestic - ACTUAL
-------------------------------------------------
-  1st class cost : $actual_dom_first_cost
-  1st class addl : $new_dom_first_addl
-  Priority cost  : $actual_dom_priority_cost
-  Priority addl  : $new_dom_priority_addl
-  Discount Profile Amount : $new_dom_dp_addl_cost
-  Discount Profile Name   : $new_dom_dp_name
-
 Domestic - NEW
 ------------------------------------------------
-  1st class cost : $new_dom_first_cost
-  1st class addl : $new_dom_first_addl
-  Priority cost  : $new_dom_priority_cost
-  Priority addl  : $new_dom_priority_addl
-  Discount Profile Amount : $new_dom_dp_addl_cost
-  Discount Profile Name   : $new_dom_dp_name
-
+  Calculated 
 
 International - CURRENT
 ------------------------------------------------
-  Economy ROW cost : $curr_intl_ipa_row_cost
-  Economy ROW addl : $curr_intl_ipa_row_addl
-  Economy CA cost : $curr_intl_ipa_ca_cost
-  Economy CA addl : $curr_intl_ipa_ca_addl
+  Economy ROW cost : $curr_intl_row_cost
+  Economy ROW addl : $curr_intl_row_addl
   Discount Profile Amount : $curr_intl_dp_addl_cost
   Discount Profile Name   : $curr_intl_dp_name
 
 International - NEW
 ------------------------------------------------
-  Economy/IPA ROW cost : $new_intl_ipa_row_cost
-  Economy/IPA ROW addl : $new_intl_ipa_row_addl
-  Economy/IPA CA cost : $new_intl_ipa_ca_cost
-  Economy/IPA CA addl : $new_intl_ipa_ca_addl
-  E-Packet    ROW cost : $new_intl_epacket_row_cost
-  E-Packet    ROW addl : $new_intl_epacket_row_addl
-  E-Packet    CA cost : $new_intl_epacket_ca_cost
-  E-Packet    CA addl : $new_intl_epacket_ca_addl
-  Discount Profile Amount : $new_intl_dp_addl_cost    ( shouldn't this be .55 * weight? )
-  Discount Profile Name   : $new_intl_dp_name    
+  E-Packet ROW cost : $new_intl_epacket_row_cost
+  E-Packet ROW addl : $new_intl_epacket_row_addl
+  Discount Profile Amount : $idp->{EachAdditionalAmount}
+  Discount Profile Name   : $idp->{DiscountProfileName}    
 
 END
 
+		my $request = $request_reviseitem_default;
+		$request =~ s/__ItemID__/$item_id/;
+		$request =~ s/__SHIPPING_DETAILS__/$shipping_details_xml/;
+#    print "$request \n\n";
+#    exit;
   }
 
 
-	#
-	# REVISE ITEM
-	#
+	################################################################################
+	# TODO: REVISE ITEM ON EBAY
+	################################################################################
 	if ( $REVISE_ITEM ) {
     $header->remove_header('X-EBAY-API-CALL-NAME');
     $header->push_header('X-EBAY-API-CALL-NAME' => 'ReviseFixedPriceItem');
@@ -797,17 +947,19 @@ END
   
 	}
 
-  # Write Output file
-  $actual_dom_first_cost = 'n/a' unless defined $actual_dom_first_cost;
-
+  ################################################################################
+  # Write Output files
+  ################################################################################
   if ( ! defined $r->{Variations} ) {
     # Non-Variation
     my $r = $recommended_list;
     my $break_even = $r->[0];
     my $list_diff = $break_even ? sprintf( "%d", (($list-$break_even)/$break_even)*100) : 'n/a';
-    $profit_loss = sprintf("%0.2f",$profit_loss);
+    $profit_amt = sprintf("%0.2f",$profit_amt);
+    my $profit_perc = ($profit_amt / $cost) * 100;  # TODO: technically cost should be "total cost", ie. including packaging
+    $profit_amt = sprintf("%0.2f",$profit_perc);
 
-    print $outfh qq/\n$item_id,"$title",,$ozs,$cost,$actual_dom_first_cost,$list,$profit_loss,$break_even,$r->[10],$r->[20],$r->[30],$r->[40],$r->[50],$r->[60],$r->[70],$r->[80],$r->[90],$r->[100]/;
+    print $outfh qq/\n$item_id,"$title",,$ebay_total_ozs,$db_total_packaged_ozs,$cost,$list,$profit_amt,$break_even,$r->[10],$r->[20],$r->[30],$r->[40],$r->[50],$r->[60],$r->[70],$r->[80],$r->[90],$r->[100]/;
   }
   else {
     # Variations
@@ -817,9 +969,9 @@ END
       my $r = $var_cost->{$v}->{recommended_list};
       my $break_even = $r->[0];
       my $list_diff = $break_even ? sprintf( "%d", (($list-$break_even)/$break_even)*100) : 'n/a';
-      my $profit_loss = sprintf("%0.2f",$var_cost->{$v}->{profit_loss});
+      my $profit_amt = sprintf("%0.2f",$var_cost->{$v}->{profit_amt});
 
-      print $outfh qq/\n"$item_id","$title","$v","$ozs","$cost","$actual_dom_first_cost","$list","$profit_loss","$break_even","$r->[10]","$r->[20]","$r->[30]","$r->[40]","$r->[50]","$r->[60]","$r->[70]","$r->[80]","$r->[90]","$r->[100]"/;
+      print $outfh qq/\n"$item_id","$title","$v",$ebay_total_ozs,$db_total_packaged_ozs,"$cost","$list","$profit_amt","$break_even","$r->[10]","$r->[20]","$r->[30]","$r->[40]","$r->[50]","$r->[60]","$r->[70]","$r->[80]","$r->[90]","$r->[100]"/;
     }
   }
 
@@ -914,163 +1066,205 @@ sub submit_request {
 } # end submit_request()
 
 
-####################################################################################################
-sub get_dom_first_cost {
-  my $oz = shift;
-  my $coz = ceil($oz); # round up
 
-  # as of 4/17/2016
-  # http://pe.usps.com/text/dmm300/Notice123.htm
-  my $shipping_rate_table_commercial_base = {
-    1   => '2.60',
-    2   => '2.60',
-    3   => '2.60',
-    4   => '2.60',
-    5   => '2.60',
-    6   => '2.60',
-    7   => '2.60',
-    8   => '2.60',
-    9   => '3.30',
-    10  => '3.35',
-    11  => '3.40',
-    12  => '3.45',
-    13  => '3.50',
-    14  => '3.55',
-    15  => '3.60',
-    16  => '3.65',
-  };
-
-  # Do not offer first class shipping if it weighs more than 16oz.
-  return undef 
-    if ( $oz > 16 );
-
-  die "ERROR: Invalid weight of '$oz' passed into get_dom_first_cost()"
-    if ( ! defined $shipping_rate_table_commercial_base->{ $coz } );
-
-  return $shipping_rate_table_commercial_base->{ $coz };
-}
-
-sub get_dom_first_addl {
-  my $oz = shift;
-  $oz = ceil($oz); # round up
-
-  return get_dom_first_cost($oz);  # always zero because domestic is "free"
-}
-
-sub get_dom_priority_cost {
-  my $oz = shift;
-  my $coz = ceil($oz);     # round up
-  my $lbs = ceil($oz/16);  # round up
-
-  # as of 4/17/2016
-  # http://pe.usps.com/text/dmm300/Notice123.htm
-  my $shipping_rate_table_commercial_base = {
-    1 => '6.20',   # <= 1 lbs
-    2 => '8.15',   # <= 2 lbs
-    3 => '9.75',   # <= 3 lbs
-    4 => '10.66',  # <= 4 lbs
-    5 => '11.26',  # <= 5 lbs
-    6 => '12.11',  # <= 6 lbs
-    7 => '12.99',  # <= 7 lbs
-  };
-
-  die "weight greater than 7 lbs, update hash table" if ($lbs>7);
-
-  my $cost = $shipping_rate_table_commercial_base->{$lbs} ;
-
-  return $cost;
-}
-
-sub get_dom_priority_addl {
-  my $oz = shift;
-  $oz = ceil($oz); # round up
-
-  my $cost = 0;
-
-  return $cost;
-}
-
-#
-#  IPA shipping costs
-#
-sub get_intl_ipa_row_cost {
-  my $oz = shift;
-  $oz = ceil($oz); # round up
-
-  # price as of 3/22/2016
-  my $cost = 2.61 + ($oz * .57);
-
-  return $cost;
-}
-
-sub get_intl_ipa_row_addl {
-  my $oz = shift;
-  $oz = ceil($oz); # round up
-
-  my $cost = $oz * .57;
-
-  return $cost;
-}
-
-sub get_intl_ipa_ca_cost {
-  my $oz = shift;
-  $oz = ceil($oz); # round up
-
-  # price as of 3/22/2016
-  my $cost = 2.59 + ($oz * .39);
-
-  return $cost;
-}
-
-sub get_intl_ipa_ca_addl {
-  my $oz = shift;
-  $oz = ceil($oz); # round up
-
-  my $cost = $oz * .39;
-
-  return $cost;
-}
-
-#
+################################################################################
 # E-Packet shipping cost
-#
+################################################################################
 
+sub get_dom_calc_shipping_cost {
+  my $oz = shift;
+
+  # NOTE:  Can't round up, some items are 15.9oz so that they stay under 16oz Priority mail limit
+  # $oz = ceil($oz); # round up
+  
+  my $cost;
+
+  # NOTE:  Using 7 zones as a baseline for estimates. 
+  #        Using Commercial Base Plus pricing
+  #        Prices based on 2/3/2019.
+
+  if ( $oz < 16 ) {
+    #
+    # First Class
+    #
+    switch ($oz) {
+      case [1..4]   { $cost = '2.96' }
+      case [5..8]   { $cost = '3.49' }
+      case [9..12]  { $cost = '4.19' }
+      case [13..16] { $cost = '5.38' }
+      else          { die "ERROR calculating shipping cost" }
+    }
+  }
+  else
+  {
+    # 
+    # Priority
+    #
+    switch ($oz) {
+      case [9..16]      { $cost = '7.99'  }
+      case [17..32]     { $cost = '10.23' }
+      case [33..48]     { $cost = '13.10' }
+      case [49..64]     { $cost = '15.59' }
+      case [65..80]     { $cost = '17.92' }
+      case [81..96]     { $cost = '20.83' }
+      case [97..112]    { $cost = '23.48' }
+      case [113..128]   { $cost = '25.85' }
+      case [129..144]   { $cost = '28.00' }
+      case [145..160]   { $cost = '30.79' }
+      case [161..176]   { $cost = '33.51' }
+      case [177..192]   { $cost = '36.23' }
+      case [193..208]   { $cost = '37.69' }
+      case [209..224]   { $cost = '39.79' }
+      case [225..240]   { $cost = '40.56' }
+      case [241..256]   { $cost = '42.84' }
+      case [257..272]   { $cost = '45.07' }
+      case [273..288]   { $cost = '47.29' }
+      case [289..304]   { $cost = '49.49' }
+      case [305..320]   { $cost = '51.34' }
+      else              { die "ERROR calculating shipping cost" }
+    }
+  }
+}
+
+
+################################################################################
+# International E-Packet Rest-Of-World (row) shipping cost
+################################################################################
 sub get_intl_epacket_row_cost {
   my $oz = shift;
   $oz = ceil($oz); # round up
 
-  # price as of 3/22/2016
-  my $cost = 3.50 + ($oz * .55);
+  # price as of 1/30/2019
+  # $3.30 per piece + $11.22 per pound (~ .70/oz)
+  my $cost = 3.30 + ($oz * .70);
+  $cost = sprintf("%0.2f",$cost);
+
+  # Business rule: round up to eitehr .59 or .99
+  my ($dollars,$cents) = ($cost =~ /^(\d+)\.(\d\d)$/);
+  $cents = $cents <= 59 ? '59' : '99';
+  $cost = "$dollars.$cents";
 
   return $cost;
 }
 
+################################################################################
+# International E-Packet Rest-Of-World (row) additional item shipping cost
+################################################################################
 sub get_intl_epacket_row_addl {
   my $oz = shift;
   $oz = ceil($oz); # round up
 
-  my $cost = $oz * .55;
+  my $cost = $oz * .70;
+  $cost = sprintf("%0.2f",$cost);
+
+  # Business rule: round up to .50 or whole dollar
+  my ($dollars,$cents) = ($cost =~ /^(\d+)\.(\d\d)$/);
+  if ( $cents <= 50 ) {
+    $cents = '50';
+  }
+  else {
+    $cents = '00';
+    $dollars += 1;
+  }
+  $cost = "$dollars.$cents";
 
   return $cost;
 }
 
-sub get_intl_epacket_ca_cost {
-  my $oz = shift;
-  $oz = ceil($oz); # round up
 
-  # price as of 3/22/2016
-  my $cost = 3.50 + ($oz * .34);
+################################################################################
+# International E-Packet countries
+################################################################################
+sub getShipToLocations
+{
+  # NOTE:
+  #   Last Update: 2/10/2019
+  #   Excluding  :  Russia and Brazil (due to high number of shipping issues to these countries)
+  #   36 countries total ( 34 excluding RU and BR )
+  #  'Great Britain' and 'United Kingdom' are the same country code
+  
+  my $shipToLocations = {
+		'AU' => 'Australia',
+		'AT' => 'Austria',
+		'BE' => 'Belgium',
+		'CA' => 'Canada',
+		'HR' => 'Croatia',
+		'DK' => 'Denmark',
+		'EE' => 'Estonia',
+		'FI' => 'Finland',
+		'FR' => 'France',
+		'DE' => 'Germany',
+		'GI' => 'Gibraltar',
+		'GR' => 'Greece',
+		'HK' => 'Hong Kong',
+		'HU' => 'Hungary',
+		'IE' => 'Ireland',
+		'IL' => 'Israel',
+		'IT' => 'Italy',
+		'JP' => 'Japan',
+		'LV' => 'Latvia',
+		'LT' => 'Lithuania',
+		'LU' => 'Luxembourg',
+		'MY' => 'Malaysia',
+		'MT' => 'Malta',
+		'NL' => 'Netherlands',
+		'NZ' => 'New Zealand',
+		'NO' => 'Norway',
+		'PL' => 'Poland',
+		'PT' => 'Portugal',
+		'SG' => 'Singapore',
+		'KR' => 'South Korea',
+		'ES' => 'Spain',
+		'SE' => 'Sweden',
+		'CH' => 'Switzerland',
+		'GB' => 'United Kingdom',
+  };
 
-  return $cost;
+  my @shipToLocations = sort keys $shipToLocations;
+
+  return \@shipToLocations;
 }
 
-sub get_intl_epacket_ca_addl {
-  my $oz = shift;
-  $oz = ceil($oz); # round up
+sub getListPrice
+{
+  my $profit_perc = shift;
 
-  my $cost = $oz * .34;
+  # Fees
+  my $final_value_fee = .09;
+  my $top_rated_seller_discount = .8;   # Assuming seller always has this status. Seller only pays 80% of FVF.
+  my $paypal_fee_perc = .027;           # PayPal fee = 2.7% + 30 cents
+  my $paypal_fee_amt  = .30;
+  my $shipping_materials = .25;         # guestimate per bubble mailer (probably on the high side)
 
-  return $cost;
+  my $price_to_fees_ratio = 100 - (($final_value_fee * $top_rated_seller_discount) + $paypal_fee_perc); # .901
+
+  my $desired_profit_amt = ($profit_perc/100)*$cost;
+
+  # List Price Calculation
+  my $list_price = ($cost + $desired_profit_amt + $shipping_materials + $paypal_fee_amt) / $price_to_fees_ratio;
+
+  return sprintf("%.2f", $list_price);
+
 }
+
+sub getProfitAmount
+{
+  my ($list,$cost) = @_;
+
+  # Fees
+  my $final_value_fee = .09;
+  my $top_rated_seller_discount = .8;   # Assuming seller always has this status. Seller only pays 80% of FVF.
+  my $paypal_fee_perc = .027;           # PayPal fee = 2.7% + 30 cents
+  my $paypal_fee_amt  = .30;
+  my $shipping_materials = .25;         # guestimate per bubble mailer (probably on the high side)
+
+  my $price_to_fees_ratio = 100 - (($final_value_fee * $top_rated_seller_discount) + $paypal_fee_perc); # .901
+
+  # Profit Calculation
+  my $profit_amt =  ($list * $price_to_fees_ratio) - $cost - $shipping_materials - $paypal_fee_amt;
+
+  return = sprintf("%.2f", $profit_amt );
+}
+
 
 
