@@ -226,45 +226,46 @@ Wx::Event::EVT_BUTTON($self, $self->{btn_print}->GetId, \&btn_print_onClick);
       Wx::Font->new(18, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_MAX, 0, '', wxFONTENCODING_DEFAULT) );
 
   # E-Packet: List of eligible countries ( According to USPS website 10/02/2016 - https://www.usps.com/business/international-shipping.htm )
-  my @epacket_list = qw(
-        Australia
-        Austria
-        Belgium
-        Brazil
-        Canada
-        Croatia
-        Denmark
-        Estonia
-        Finland
-        France
-        Germany
-        Gibraltar
-        Greece
-        Hungary
-        Ireland
-        Israel
-        Italy
-        Japan
-        Latvia
-        Lithuania
-        Luxembourg
-        Malaysia
-        Malta
-        Netherlands
-        Norway
-        Portugal
-        Russia
-        Singapore
-        Spain
-        Sweden
-        Switzerland
-      );
+  my $shipToLocations = {
+		'AU' => 'Australia',
+		'AT' => 'Austria',
+		'BE' => 'Belgium',
+    'BR' => 'Brazil',
+		'CA' => 'Canada',
+		'HR' => 'Croatia',
+		'DK' => 'Denmark',
+		'EE' => 'Estonia',
+		'FI' => 'Finland',
+		'FR' => 'France',
+		'DE' => 'Germany',
+		'GI' => 'Gibraltar',
+		'GR' => 'Greece',
+		'HK' => 'Hong Kong',
+		'HU' => 'Hungary',
+		'IE' => 'Ireland',
+		'IL' => 'Israel',
+		'IT' => 'Italy',
+		'JP' => 'Japan',
+		'LV' => 'Latvia',
+		'LT' => 'Lithuania',
+		'LU' => 'Luxembourg',
+		'MY' => 'Malaysia',
+		'MT' => 'Malta',
+		'NL' => 'Netherlands',
+		'NZ' => 'New Zealand',
+		'NO' => 'Norway',
+		'PL' => 'Poland',
+		'PT' => 'Portugal',
+    'RU' => 'Russia',
+		'SG' => 'Singapore',
+		'KR' => 'South Korea',
+		'ES' => 'Spain',
+		'SE' => 'Sweden',
+		'CH' => 'Switzerland',
+		'GB' => 'United Kingdom',    # a.k.a. Great Britain
+  };
 
-  push( @epacket_list, ('Hong Kong', 'New Zealand', 'Great Britain', 'United Kingdom') ); # NOTE: United Kingdom is not actually on the list, so we have to
-                                                                                          #       change in to 'Great Britain' before creating the label
-  for my $c ( @epacket_list ) {
-    $c =~ s/^\s+//;
-    $c =~ s/\s+$//;
+  for my $c ( keys %$shipToLocations ) {
     $self->{epacket_eligible_countries}->{uc($c)} = 1;
   }
 
@@ -798,7 +799,7 @@ sub populate_single_page {
 
   # Note: This changes the value in the drop down, but it does NOT change the mail class
   if ( $self->{type} eq 'I' ) {                     # International
-    if ( $self->isEPacketEligible($pkg->countryname) ) {
+    if ( $self->isEPacketEligible($pkg->country) ) {
  	    $self->{choice_mailclass}->SetSelection(1);   # E-Packet
     }
     else {
@@ -1981,12 +1982,12 @@ sub tc_oz_evtTextEnter {
         $self->warning_dialog( 'ERROR: Package over 4.4 lbs. Manually ship International Priority or split into multiple packages.' ); 
         return 0;
       }
-      elsif ( $self->isEPacketEligible($p->countryname) ) {
+      elsif ( $self->isEPacketEligible($p->country) ) {
 
         # Note: Change 'United Kingdom' to 'Great Britain' because e-packet only allows the latter
         #       Change 'Repulic of Croatia' to 'Croatia'
-        $p->countryname('Great Britain') if (  $p->countryname =~ /United Kingdom/i );
-        $p->countryname('Croatia') if (  $p->countryname =~ /Republic of Croatia/i );
+        #$p->countryname('Great Britain') if (  $p->countryname =~ /United Kingdom/i );
+        #$p->countryname('Croatia') if (  $p->countryname =~ /Republic of Croatia/i );
 
         # ePacket: Send ePacket if destination is eligible
         $mail_class = $mc->{'E-Packet'}->{mailclass};
