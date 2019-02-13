@@ -228,6 +228,7 @@ Wx::Event::EVT_BUTTON($self, $self->{btn_print}->GetId, \&btn_print_onClick);
   # E-Packet: List of eligible countries ( According to USPS website 10/02/2016 - https://www.usps.com/business/international-shipping.htm )
   my @epacket_list = qw(
         Australia
+        Austria
         Belgium
         Brazil
         Canada
@@ -238,6 +239,7 @@ Wx::Event::EVT_BUTTON($self, $self->{btn_print}->GetId, \&btn_print_onClick);
         France
         Germany
         Gibraltar
+        Greece
         Hungary
         Ireland
         Israel
@@ -249,8 +251,9 @@ Wx::Event::EVT_BUTTON($self, $self->{btn_print}->GetId, \&btn_print_onClick);
         Malaysia
         Malta
         Netherlands
-	Norway
+        Norway
         Portugal
+        Russia
         Singapore
         Spain
         Sweden
