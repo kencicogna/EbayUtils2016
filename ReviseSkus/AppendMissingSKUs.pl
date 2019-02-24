@@ -33,7 +33,7 @@ getopts('i:s',\%opts);
 
 die "\nUsage: $0 -i <Ebay FileExchange file>\n\n" unless $opts{i};
 my $inputfile = $opts{i};
-(my $outputfile = $inputfile) =~ s/csv/.out.csv/;
+(my $outputfile = $inputfile) =~ s/csv$/out.csv/;
 
 my $skip_dups = $opts{s};
 
