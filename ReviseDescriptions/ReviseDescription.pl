@@ -19,6 +19,11 @@ use File::Copy qw(copy move);
 use POSIX;
 use Getopt::Std;
 use Storable 'dclone';
+use Fatal qw(open close);
+
+use lib '../cfg';
+use EbayConfig;
+
 
 my %opts;
 getopts('i:raDAf',\%opts);
@@ -42,9 +47,6 @@ else {
 
 my $REVISE_ITEM = defined $opts{r} ? 1 : 0;
 my $DEBUG       = defined $opts{D} ? 1 : 0;
-my $infile      = defined $opts{I} ? $opts{I} : '';
-my $outfile     = defined $opts{O} ? $opts{O} : 'dump';
-my $ReturnAll   = defined $opts{A} ? 1 : 0;
 my $force       = defined $opts{f} ? 1 : 0;
 
 my $html_filter = HTML::Restrict->new(
@@ -62,17 +64,12 @@ my $html_filter = HTML::Restrict->new(
 # EBAY API INFO                                   #
 ###################################################
 
-my $header = HTTP::Headers->new;
-$header->push_header('X-EBAY-API-COMPATIBILITY-LEVEL' => '977');
-$header->push_header('X-EBAY-API-DEV-NAME'  => 'd57759d2-efb7-481d-9e76-c6fa263405ea');
-$header->push_header('X-EBAY-API-APP-NAME'  => 'KenCicog-a670-43d6-ae0e-508a227f6008');
-$header->push_header('X-EBAY-API-CERT-NAME' => '8fa915b9-d806-45ef-ad4b-0fe22166b61e');
-$header->push_header('X-EBAY-API-CALL-NAME' => '');                                       # Supply call name to submit_request() 
-$header->push_header('X-EBAY-API-SITEID'    => '0');                                      # 0 => usa
-$header->push_header('Content-Type'         => 'text/xml');
+# Ebay API Request Headers
+my $header = $EbayConfig::ES_http_header;
 
-# eBayAuthToken
-my $eBayAuthToken = 'AgAAAA**AQAAAA**aAAAAA**/89cWg**nY+sHZ2PrBmdj6wVnY+sEZ2PrA2dj6wHlIKoCZCBogmdj6x9nY+seQ**4EwAAA**AAMAAA**Qk4PPbHKGx2DPqAeO0Dumf0k2WyACkgfnG9eeB2Hiobbxd2iZ5n3I/YbPMaYduNN+JXxejyhONith2q9PNpf3ZjX2WHI/v3jkvDp64W/IGwCPSU6H9exrg/1eQECbnqaVEWuI5T+7Zv7M9zyQC9R0wphcJC6dG5R2BC96qQVlJIVzveitGchlx2whXgAWnbz5tZhnsgjsHRrXzUXGoQCbxgsmGrpKKYoSBZLvl2r4gWKFO0/iNOoDBQiLL7q00nI3wDlCODjAu6QtJqgAzRLBjNBX9TGljUP/MQLHG37kFRhSvhGBt7rPjkMaqW/CFar4GtCWP/0rK/8OUFDvGIKjhHWJ8c+UTCMtb1N83MMj+Sm8JvrpACOGKV65yKEzyvFQtG9TmL/OiPuPX7/ouRI2IHRYoJ7RKbC6u9YYtvdRBL7xsjiXbkIMlAeVxv2aeZNhaf4WaXLKCAYC8DQPjX9pE/FiM/D0B3LofIobVO79IQJz61eh1+pF2zBYWQ9bSELZLBXHsRYmPVC6b21tyBTatloDTzddVVRSqVn5eg/pW73Sq5EOmwhBYiKfp8xFkpjCRvP+VDQowetVv7XF733/RBEMUpnhzK1oyr8y5sPzpJ+uGtLzqVmARDKCYcX1xo5B046/QHpiJlxQubac80XweKguowFJP+jOh6MfqRHZtj8TNcS1XHzO3/ZAj9Mt7Wu7TFSlctG557ESJXa/rxehfQKsm3Cc3MHYE9aBPmrrweuGK/n3UMPstxPb+aqXjV/';
+# Ebay Authentication Token
+my $eBayAuthToken = $EbayConfig::ES_eBayAuthToken;
+
 
 my $request_getitem_default = <<END_XML;
 <?xml version='1.0' encoding='utf-8'?>
@@ -83,9 +80,14 @@ my $request_getitem_default = <<END_XML;
   <WarningLevel>High</WarningLevel>
   <DetailLevel>ReturnAll</DetailLevel>
   <ItemID>__ItemID__</ItemID>
-  <IncludeItemSpecifics>TRUE</IncludeItemSpecifics>
+  <OutputSelector>ItemID</OutputSelector>
+  <OutputSelector>Site</OutputSelector>
+  <OutputSelector>Title</OutputSelector>
+  <OutputSelector>Description</OutputSelector>
 </GetItemRequest>
 END_XML
+
+#  <IncludeItemSpecifics>TRUE</IncludeItemSpecifics>
 
 my $request_getmyebayselling = <<END_XML;
 <?xml version='1.0' encoding='utf-8'?>
@@ -140,18 +142,28 @@ if ( ! $process_all_items ) {
 	push(@all_items,@item_list);
 }
 else {
+
   while ( $pagenumber <= $maxpages ) {
     $request = $request_getmyebayselling;
     $request =~ s/__PAGE_NUMBER__/$pagenumber/;
     $response_hash = submit_request( 'GetMyeBaySelling', $request, $header );
+
     for my $i ( @{$response_hash->{ActiveList}->{ItemArray}->{Item}} ) {
+
+      # NOTE: Exclude foreign listings by currency (not perfect, some other countries could use USD)
+      #       But, by doing a check here, we avoid a lot of extra API calls later 
+      #       The foreign listing are created by a third party and already have teh viewport tag.
+      next if ($i->{SellingStatus}->{CurrentPrice}->{currencyID} ne 'USD');
+
       push(@all_items, $i->{ItemID});
     }
+
     if ($pagenumber==1) {
       $maxpages = $response_hash->{ActiveList}->{PaginationResult}->{TotalNumberOfPages};
     }
     $pagenumber++;
   }
+
 }
 
 my $all_items_count = scalar @all_items;
@@ -168,7 +180,7 @@ if ( ! -d $bkp_dir ) {
 for my $item_id ( reverse @all_items ) {
 
   # Skip this is if already processed
-  my $bkp_file = "$bkp_dir/${item_id}.txt";
+  my $bkp_file = "$bkp_dir/${item_id}.html";
   if ( ! -e  $bkp_file || $force ) {
     print "\nStarting $item_id";
   }
@@ -183,16 +195,40 @@ for my $item_id ( reverse @all_items ) {
 
   my $ebayResponse = submit_request( 'GetItem', $request, $header );
   my $ebayListing = $ebayResponse->{Item};
+  my $title       = $ebayListing->{Title};
+  my $raw_html    = $ebayListing->{Description};
+  my $site        = $ebayListing->{Site};
 
-  print Dumper($ebayListing) if $DEBUG;
+  print "\n",Dumper($ebayListing) if $DEBUG;
+
+  # Exclude foreign listing (the foreign listing are created by a third party and already have teh viewport tag)
+  if ( $site ne 'US' ) {
+    print " ....skipping foreign listing";
+    next;
+  }
+
+  # Save the current html as a backup
+  open my $fh, '>', $bkp_file;
+  print $fh $raw_html;     
+  close $fh;
 
   my $description = parse_description_html( $ebayListing );
 
-  next unless ( $description );
+  if ( ! $description ) {
+    die qq/\n$item_id,"$title","ERROR: No description after parsing!"/;
+  }
 
+  # Add mobile friendly html display tag
   $description = '<meta name="viewport" content="width=device-width, initial-scale=1">' . "\n" . $description;
 
   print Dumper($description) if $DEBUG;
+
+  # Save new html for debugging
+  if ( $DEBUG ) {
+    open my $fh, '>', "${item_id}.new.html";
+    print $fh $description;     
+    close $fh;
+  }
 
   #
   # Revise listing with new description
@@ -201,10 +237,22 @@ for my $item_id ( reverse @all_items ) {
     $request = $request_reviseitem_default;
     $request =~ s/__ItemID__/$item_id/;
     $request =~ s/__DESCRIPTION__/<![CDATA[$description]]>/;
-#    print $request; exit;
-    my $ebayResponse = submit_request( 'ReviseFixedPriceItem', $request, $header );
-    my $ebayListing = $ebayResponse->{Item};
+
+    my $r;
+		eval {
+      $r = submit_request( 'ReviseFixedPriceItem', $request, $header );
+		};
+		if ( $@ ) {
+      # Print errors
+			print qq/$item_id,"$title","ERROR: Submit ReviseFixedPriceItem failed. $@"\n/;
+			next;
+		}
+    # Print warnings
+    if ( $r->{LongMessage} ) {
+      print qq/\n$item_id,"$title","$r->{LongMessage}"/;
+    }
   }
+
 }
 
 print "\n\n";
@@ -219,18 +267,6 @@ sub parse_description_html {
 
   die "\n\nERROR: NO 'Description' key in the ebayListing hash!"
     if ( ! $html );
-
-  # Save the current html as a backup
-  my $bkp_file = "$bkp_dir/$listing->{ItemID}.txt";
-  eval {
-    open my $fh, '>', $bkp_file;
-    print $fh $html;
-    close $fh;
-  };
-  if ($@) {
-    print "\nERROR: ",$listing->{ItemID};
-    print "\n$@";
-  }
 
   $desc = $html_filter->process( $html );
 

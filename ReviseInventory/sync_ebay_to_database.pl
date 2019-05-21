@@ -2,9 +2,6 @@
 
 
 use strict;
-
-
-use strict;
 use lib '../cfg';
 
 use LWP::UserAgent;
