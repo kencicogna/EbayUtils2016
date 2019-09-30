@@ -43,36 +43,132 @@ my $GeteBayDetailsRequest_xml = <<END_XML;
   <RequesterCredentials>
     <eBayAuthToken>$eBayAuthToken</eBayAuthToken>
   </RequesterCredentials>
-  <DetailName>ShippingLocationDetails</DetailName>    
+  <DetailName>ExcludeShippingLocationDetails</DetailName>    
 </GeteBayDetailsRequest>
 END_XML
 
+# Regions you can ship to
+#  <DetailName>ShippingLocationDetails</DetailName>    
+
+#  Specific countries you can exclude
+#  <DetailName>ExcludeShippingLocationDetails</DetailName>    
+
+# Can't ship directly to this list of countries (for some reason)
 #  <DetailName>CountryDetails</DetailName>    
-# ShippingLocationDetails
 
 ###########################################################
 # END EBAY API INFO                                       #
 ###########################################################
+
+my $shipToLocations = {
+		'AU' => 'Australia',
+		'AT' => 'Austria',
+		'BE' => 'Belgium',
+    'BR' => 'Brazil',
+		'CA' => 'Canada',
+		'HR' => 'Croatia',
+		'DK' => 'Denmark',
+		'EE' => 'Estonia',
+		'FI' => 'Finland',
+		'FR' => 'France',
+		'DE' => 'Germany',
+		'GI' => 'Gibraltar',
+		'GR' => 'Greece',
+		'HK' => 'Hong Kong',
+		'HU' => 'Hungary',
+		'IE' => 'Ireland',
+		'IL' => 'Israel',
+		'IT' => 'Italy',
+		'JP' => 'Japan',
+		'LV' => 'Latvia',
+		'LT' => 'Lithuania',
+		'LU' => 'Luxembourg',
+		'MY' => 'Malaysia',
+		'MT' => 'Malta',
+		'NL' => 'Netherlands',
+		'NZ' => 'New Zealand',
+		'NO' => 'Norway',
+		'PL' => 'Poland',
+		'PT' => 'Portugal',
+    'RU' => 'Russia',
+		'SG' => 'Singapore',
+		'KR' => 'South Korea',
+		'ES' => 'Spain',
+		'SE' => 'Sweden',
+		'CH' => 'Switzerland',
+		'GB' => 'United Kingdom',    # a.k.a. Great Britain
+  };
 
 
 ################################################################################
 # Get list of all item id's
 ################################################################################
 
-my @all_countries;
-
 my $response = submit_request( 'GeteBayDetails', $GeteBayDetailsRequest_xml, $header );
 print Dumper($response);
 
-for my $c ( @{$response->{CountryDetails}} ) 
-{
-   push ( @all_countries, $c->{Description});
+# Shipping Locations (Regions which you can ship)
+if ( defined $response->{ShippingLocationDetails} ) {
+  for my $c ( @{$response->{ShippingLocationDetails}} ) 
+  {
+    printf("%-10s %s\n",$c->{ShippingLocation},$c->{Description});
+  }
 }
 
-for my $c ( sort @all_countries ) 
-{
-  print "$c\n";
+# Country codes / details (you can not specify these as shipping destinations)
+if ( defined $response->{CountryDetails} ) {
+  for my $c ( @{$response->{CountryDetails}} ) 
+  {
+    printf("%-4s %s\n",$c->{Country},$c->{Description});
+  }
 }
+
+# Shipping exclusions (countries you can specifically exclude from a shipping region)
+if ( defined $response->{ExcludeShippingLocationDetails} ) {
+
+  my $all_regions     = {};
+  my $shipto_regions  = {};
+  my $exclude_list    = {};
+
+  for my $c ( @{$response->{ExcludeShippingLocationDetails}} ) 
+  {
+    printf("%-4s   %s\n",$c->{Location},$c->{Description});
+    $all_regions->{ $c->{Region} }->{ $c->{Location} } = $c->{Description};
+    if (defined $shipToLocations->{$c->{Location}}) {
+      $shipto_regions->{ $c->{Region} }++;
+    }
+  }
+
+  print "\n\nAll Regions\n";
+  for my $r ( sort keys %$all_regions ) {
+    printf("%s\n",$r)
+  }
+
+  print "\n\nShipto Regions\n";
+  for my $r ( sort keys %$shipto_regions ) {
+    printf("\n%s",$r);
+    my %region_location_names = reverse %{$all_regions->{$r}};
+    #for my $loc ( sort keys $all_regions->{$r} ) {
+    for my $loc_name ( sort keys %region_location_names ) {
+      my $ok = 'ok';
+      my $abbr = $region_location_names{$loc_name};
+
+      if ( ! defined $shipToLocations->{$abbr} ) {
+        $ok='';
+        $exclude_list->{ $abbr } = $all_regions->{$r}->{$abbr};     # TODO: Also need to exclude entire regions we don't ship to, in addition to the regions of specific countries 
+                                                                    #       Ultimately we should set this up in site preferences and set: SellerExcludeShipToLocationsPreference='true'
+      }
+      printf ("\n\t%-15s  %2s %s",$abbr,$ok,$all_regions->{$r}->{$abbr});
+    }
+  }
+
+  print "\n\nExclude Regions\n";
+  for my $loc ( sort keys %$exclude_list ) {
+    printf ("%-4s  %s\n",$exclude_list->{$loc}, $loc);
+  }
+
+}
+
 
 exit;
 

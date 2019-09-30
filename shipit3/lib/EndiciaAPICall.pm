@@ -2,6 +2,8 @@ package EndiciaAPICall;
 
 use strict;
 use SOAP::Lite;
+#use SOAP::Lite +trace => 'all';
+
 use MIME::Base64;
 use Moose;
 
@@ -284,7 +286,22 @@ sub _GetLabel {
 
   # Wrap our XML up in a SOAP object and make the API call
   my $elements = SOAP::Data->type( 'xml' => $self->{XMLRequest} );
-  my $response = $soap->$call($elements);
+
+  # DEBUGGING
+#  print "\n\nSOAP OBJ: ", Dumper($soap), "\n\n";
+#  print "\n\nSOAP ELEMENTS: ", Dumper($elements), "\n\n";
+#  print "\n\nSOAP CALL: ", Dumper($call), "\n\n";
+
+  my $response;
+  eval {
+    $response = $soap->$call($elements);
+  };
+  if ($@) {
+    # DEBUGGING
+#    print "\n\nSOAP RESPONSE: ", Dumper($response), "\n\n";
+#    print "\n\nSELF: ", Dumper($self),"\n\n";
+    die "\n\nERROR: Soap call failed with error message: $@\n\n";
+  }
 
   die $response->faultstring() if defined $response->fault();
 
@@ -503,7 +520,7 @@ sub _setHeaderValues() {
     $self->Proxy             ( 'https://labelserver.endicia.com/LabelService/EwsLabelService.asmx' );
     $self->RequesterID       ( '1139691' );
     $self->AccountID         ( '1139691' );
-    $self->PassPhrase        ( 'ILovetacos27' );
+    $self->PassPhrase        ( 'GiveMeTacos27' );   # different from password. To reset: http://www.endicia.com/support/forgot-passphrase.
     $self->_setTokenFromFile ( 'cfg/endicia_api_production_token.txt' );
   }
   else {
@@ -511,7 +528,7 @@ sub _setHeaderValues() {
     $self->CallName          ( 'GetPostageLabel' );
     $self->Uri               ( 'www.envmgr.com/LabelService' );
     $self->Proxy             ( 'https://elstestserver.endicia.com/LabelService/EwsLabelService.asmx' );
-    $self->RequesterID       ( 'lxxx' );
+    $self->RequesterID       ( '2502641' );
     $self->AccountID         ( '2502641' );
     $self->PassPhrase        ( 'its only a FLESH w0und!' );
 #     $self->AccountID         ( '2513440' );
