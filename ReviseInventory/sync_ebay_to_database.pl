@@ -271,8 +271,8 @@ END_SQL
 
 $self->{dbh} =
   DBI->connect( "DBI:ODBC:$ODBC",
-                'shipit2',
-                'shipit2',
+                'shipit',
+                'shipit',
                 { 
                   RaiseError       => 0, 
                   AutoCommit       => 1, 
