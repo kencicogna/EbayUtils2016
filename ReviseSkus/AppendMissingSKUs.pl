@@ -38,11 +38,11 @@ my $inputfile = $opts{i};
 my $skip_dups = $opts{s};
 
 # Init
-my %all_skus;   # check for dups
+my $all_skus = {};   # check for dups
 
 
 # DB Connection
-my $dbh = DBI->connect( "DBI:ODBC:$ODBC", 'shipit2', 'shipit2',
+my $dbh = DBI->connect( "DBI:ODBC:$ODBC", 'shipit', 'shipit',
                   { 
                     RaiseError       => 0, 
                     AutoCommit       => 1, 
@@ -105,7 +105,10 @@ while (my $row = $csv->getline ($fh)) {
     next if ( $site ne 'US' ); 
 
     # Only count US site SKU's (we know the SKU is duplicated across sites)
-    $all_skus{$sku}++ if $sku;
+    if ($sku) {
+      $all_skus->{$sku}->{count}++;
+      push( @{$all_skus->{$sku}->{rows}}, $rownum);
+    }
 
     $us_listings->{$itemID}->{parent} = $row;
 
@@ -122,7 +125,10 @@ while (my $row = $csv->getline ($fh)) {
 
     next if ( $parentSite ne 'US' );
 
-    $all_skus{$sku}++ if $sku;
+    if ($sku) {
+      $all_skus->{$sku}->{count}++;
+      push( @{$all_skus->{$sku}->{rows}}, $rownum);
+    }
 
     push( @{$us_listings->{$parentItemID}->{variations}}, $row);
 
@@ -135,9 +141,9 @@ while (my $row = $csv->getline ($fh)) {
 close $fh;
 
 my $dups;
-for my $s ( keys %all_skus ) {
-  if ( $all_skus{$s} > 1 ) {
-    print "\nDuplicate SKU found: '$s'";
+for my $s ( keys %$all_skus ) {
+  if ( $all_skus->{$s}->{count} > 1 ) {
+    print "\nDuplicate SKU found: '$s' on rows ", join(', ',@{$all_skus->{$s}->{rows}}) ;
     $dups++;
   }
 }
