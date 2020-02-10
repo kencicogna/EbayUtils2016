@@ -329,7 +329,7 @@ if ( $UPDATE ) {
   # Make auto backup of Inventory table
   $self->{dbh}->do( $self->{sql}->{backup_inventory_table} ) or die "can't execute stmt";
 
-  if ( @all_items ) {
+  if ( $itemId ) {
     # Clear actives flag(s) only for itemId(s) provided
     my $sth = $self->{dbh}->prepare( $self->{sql}->{clear_active_flag} ) or die "can't execute stmt";
     for my $id ( @all_items ) {
