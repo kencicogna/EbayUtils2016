@@ -415,11 +415,19 @@ for my $item_id ( uniq sort @all_items ) {
     for my $v ( @{$r->{Variations}->{Variation}} ) {
       my $var;
 
+      # Variation name
       if ( ref($v->{VariationSpecifics}->{NameValueList} ) eq 'ARRAY' ) {
         $var = $v->{VariationSpecifics}->{NameValueList}->[0]->{Value};
       }
       else {
           $var = $v->{VariationSpecifics}->{NameValueList}->{Value};
+      }
+
+      # Skip any variation with out a SKU.  This means it still set as a 'style' in the listing, but 
+      # it's no longer being used as a variation and there are no details, so we can ignore it.
+      if ( ! $v->{SKU} ) {
+        print "\nWarning: No SKU on Variation: Title='$title' Variation='$var'";
+        next;
       }
 
       $variations->{$var}->{SKU} = $v->{SKU};
@@ -438,6 +446,11 @@ for my $item_id ( uniq sort @all_items ) {
     if ( defined $r->{Variations}->{Pictures}->{VariationSpecificPictureSet} ) {
       for my $v ( @{$r->{Variations}->{Pictures}->{VariationSpecificPictureSet}} ) {
         my $var       = $v->{VariationSpecificValue};
+
+        # Only add image info to variations being used. 
+        # Otherwise and entry gets added to the hash for a variation with out a SKU.
+        next if ( ! defined $variations->{$var} );
+
         my $extimage  = ref( $v->{ExternalPictureURL} ) eq 'ARRAY'  
                         ? $v->{ExternalPictureURL}->[0]
                         : $v->{ExternalPictureURL};
