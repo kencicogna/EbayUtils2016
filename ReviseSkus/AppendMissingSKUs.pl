@@ -14,7 +14,6 @@ use DBI;
 
 $|=1;
  
-my $basefile = 'FileExchange_Response_47120668';
 my $ODBC     = 'BTData_PROD_SQLEXPRESS';
 
 my $rownum=0;
@@ -133,7 +132,7 @@ while (my $row = $csv->getline ($fh)) {
     push( @{$us_listings->{$parentItemID}->{variations}}, $row);
 
     if ( ! $sku ) {
-      $us_listings->{$itemID}->{update}++;
+      $us_listings->{$parentItemID}->{update}++;
     }
   }
 
@@ -191,7 +190,8 @@ foreach my $id ( %$us_listings ) {
         # Get sku for child record (if needed)
         if ( ! $child->[10] ) {
           $new_sku = get_next_sku();
-          $listing->{parent}->[10] = $new_sku;
+          #$listing->{parent}->[10] = $new_sku;
+          $child->[10] = $new_sku;
         }
 
         # remove unwanted columns
