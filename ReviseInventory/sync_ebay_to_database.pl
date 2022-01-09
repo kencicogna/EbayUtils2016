@@ -472,6 +472,7 @@ for my $item_id ( uniq sort @all_items ) {
       my $avail_qty = $variations->{$variation}->{QTY};
 
       if ( $UPDATE ) {
+        #print Dumper(\$variation);  # NOTE: At some point, 3rd party assigned a variation sku that was too long.
         $sth->execute($item_id, $brand, $sku, $title, $variation, $image_url, $image_url_main,$upc,$weight_oz,$avail_qty) or die "can't execute query: $sql";
       }
 
