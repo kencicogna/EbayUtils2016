@@ -18,7 +18,8 @@ my $ODBC     = 'BTData_PROD_SQLEXPRESS';
 
 my $rownum=0;
 my $isParent = 0;
-my $header_row;
+my $header_row1=[];
+my $header_row2=[];
 my $us_listings = {};
 my $parentSite = '';
 my $parentItemID = '';
@@ -58,13 +59,19 @@ open my $fh, "<:encoding(unicode)", $inputfile or die "can't open $inputfile: $!
 
 while (my $row = $csv->getline ($fh)) {
 
-  # header row
-  if ( $rownum++ == 0 ) {
-    $header_row = $row;
+  $rownum++;
 
-    # remove unwanted columns
-    splice( @$header_row, 5, 3 );
+  # header row 1
+  if ( $rownum == 1 ) {
+    $header_row1 = $row;
+    splice( @$header_row1, 5, 3 );  # remove unwanted columns 
+    next;
+  }
 
+  # header row 2
+  if ( $rownum == 2 ) {
+    $header_row2 = $row;
+    splice( @$header_row2, 5, 3 );  # remove unwanted columns 
     next;
   }
 
@@ -146,7 +153,7 @@ for my $s ( keys %$all_skus ) {
     $dups++;
   }
 }
-die "\n\nERROR: $dups dupilcate SKU's found." if ( $dups && !$skip_dups );
+die "\n\nERROR: $dups dupilcate SKU's found. Fix on eBay, repull file from eBay, and rerun this program." if ( $dups && !$skip_dups );
 
 
 #
@@ -160,7 +167,8 @@ my $csv = Text::CSV_XS->new ({ binary => 1, eol => $/ });
 open my $outfh, ">", $outputfile or die "Can't open $outputfile: $!";
 
 # Write header row
-$csv->print ($outfh, $header_row) or $csv->error_diag;
+$csv->print ($outfh, $header_row1) or $csv->error_diag;
+$csv->print ($outfh, $header_row2) or $csv->error_diag;
 
 # Find rows that need to be updated
 foreach my $id ( %$us_listings ) {
