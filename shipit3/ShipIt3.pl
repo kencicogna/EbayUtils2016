@@ -75,93 +75,399 @@ sub new {
 	$name   = ""                 unless defined $name;
 
 # begin wxGlade: MyFrame::new
-$style = wxCAPTION|wxCLOSE_BOX|wxFULL_REPAINT_ON_RESIZE|wxMAXIMIZE_BOX|wxMINIMIZE_BOX|wxRESIZE_BORDER|wxSYSTEM_MENU 
+$style = wxCAPTION|wxCLOSE_BOX|wxFULL_REPAINT_ON_RESIZE|wxMAXIMIZE_BOX|wxMINIMIZE_BOX|wxRESIZE_BORDER|wxSYSTEM_MENU
 unless defined $style;
 
 $self = $self->SUPER::new( $parent, $id, $title, $pos, $size, $style, $name );
+$self->SetSize(Wx::Size->new(1392, 904));
+$self->SetTitle("The Teaching Toy Box - SHIP IT!");
+$self->SetBackgroundColour(Wx::Colour->new(255, 255, 255));
+
 $self->{statusbar} = $self->CreateStatusBar(1);
+$self->{statusbar}->SetStatusWidths(-1);
+
+# statusbar fields
+my( @statusbar_fields ) = (
+    "Welcome to the new and improved SHIP IT 2.0",
+);
+
+if( @statusbar_fields ) {
+    $self->{statusbar}->SetStatusText($statusbar_fields[$_], $_)
+    for 0 .. $#statusbar_fields ;
+}
+
+$self->{sizer_main} = Wx::BoxSizer->new(wxVERTICAL);
+
 $self->{panel_header} = Wx::Panel->new($self, wxID_ANY);
+$self->{panel_header}->SetBackgroundColour(Wx::Colour->new(211, 236, 240));
+$self->{sizer_main}->Add($self->{panel_header}, 0, wxEXPAND, 0);
+
+$self->{sz_status_disp_toggle} = Wx::BoxSizer->new(wxHORIZONTAL);
+
 $self->{rb_package_display} = Wx::RadioBox->new($self->{panel_header}, wxID_ANY, "Package Display", wxDefaultPosition, wxDefaultSize, ["Domestic", "International"], 0, wxRA_SPECIFY_COLS);
-$self->{lbl_status} = Wx::StaticText->new($self->{panel_header}, wxID_ANY, "  Status Message  ", wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER);
-$self->{bitmap_1} = Wx::StaticBitmap->new($self->{panel_header}, wxID_ANY, Wx::Bitmap->new("images/winter_dear.png", wxBITMAP_TYPE_ANY));
+$self->{rb_package_display}->SetSelection(0);
+$self->{sz_status_disp_toggle}->Add($self->{rb_package_display}, 0, wxALIGN_BOTTOM|wxALL, 8);
+
+$self->{sz_status_disp_toggle}->Add(5, 20, 1, 0, 0);
+
+$self->{lbl_status} = Wx::StaticText->new($self->{panel_header}, wxID_ANY, "  Status Message  ", wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER_HORIZONTAL);
+$self->{lbl_status}->SetMinSize(Wx::Size->new(-1, 29));
+$self->{lbl_status}->SetBackgroundColour(Wx::Colour->new(211, 236, 240));
+$self->{lbl_status}->SetForegroundColour(Wx::Colour->new(255, 255, 255));
+$self->{lbl_status}->SetFont(Wx::Font->new(18, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, 0, ""));
+$self->{sz_status_disp_toggle}->Add($self->{lbl_status}, 0, wxALIGN_BOTTOM|wxALL, 10);
+
+$self->{sz_status_disp_toggle}->Add(5, 20, 1, 0, 0);
+
+$self->{bitmap_1} = Wx::StaticBitmap->new($self->{panel_header}, wxID_ANY, Wx::Bitmap->new("C:\\Users\\Ken\\Pictures\\dear blue background.png", wxBITMAP_TYPE_ANY));
+$self->{sz_status_disp_toggle}->Add($self->{bitmap_1}, 0, 0, 0);
+
+$self->{sz_ship_date} = Wx::StaticBoxSizer->new(Wx::StaticBox->new($self->{panel_header}, wxID_ANY, "Advance Ship Date"), wxHORIZONTAL);
+$self->{sz_status_disp_toggle}->Add($self->{sz_ship_date}, 0, wxALIGN_BOTTOM|wxALL, 8);
+
 $self->{tc_advDays} = Wx::TextCtrl->new($self->{panel_header}, wxID_ANY, "0", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER|wxTE_RIGHT);
+$self->{sz_ship_date}->Add($self->{tc_advDays}, 0, wxALIGN_BOTTOM|wxALL, 5);
+
 $self->{lbl_days} = Wx::StaticText->new($self->{panel_header}, wxID_ANY, "Days");
-$self->{sz_ship_date_staticbox} = Wx::StaticBox->new($self->{panel_header}, wxID_ANY, "Advance Ship Date" );
-$self->{nb_main} = Wx::Notebook->new($self, wxID_ANY);
+$self->{sz_ship_date}->Add($self->{lbl_days}, 0, wxALIGN_BOTTOM|wxALL, 5);
+
+$self->{nb_main} = Wx::Notebook->new($self, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0);
+$self->{sizer_main}->Add($self->{nb_main}, 1, wxEXPAND, 0);
+
 $self->{nb_individual_pane} = Wx::Panel->new($self->{nb_main}, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL|wxFULL_REPAINT_ON_RESIZE);
+$self->{nb_main}->AddPage($self->{nb_individual_pane}, "Individual");
+
+$self->{sz_package_details} = Wx::BoxSizer->new(wxVERTICAL);
+
+$self->{sz_name_addr_weight} = Wx::BoxSizer->new(wxHORIZONTAL);
+$self->{sz_package_details}->Add($self->{sz_name_addr_weight}, 0, wxEXPAND, 5);
+
+$self->{sz_name_address} = Wx::StaticBoxSizer->new(Wx::StaticBox->new($self->{nb_individual_pane}, wxID_ANY, "Name and Address"), wxVERTICAL);
+$self->{sz_name_addr_weight}->Add($self->{sz_name_address}, 1, wxEXPAND|wxRIGHT, 5);
+
 $self->{lbl_buyer} = Wx::StaticText->new($self->{nb_individual_pane}, wxID_ANY, "Cicogna, Ken\n");
+$self->{lbl_buyer}->SetMinSize(Wx::Size->new(-1,30));
+$self->{lbl_buyer}->SetFont(Wx::Font->new(24, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, 0, "Courier New"));
+$self->{sz_name_address}->Add($self->{lbl_buyer}, 0, wxALL|wxEXPAND, 5);
+
 $self->{lbl_address} = Wx::StaticText->new($self->{nb_individual_pane}, wxID_ANY, "7 Park Road Ct.\nLombard IL, 60148\nUnited States\n");
-$self->{sz_name_address_staticbox} = Wx::StaticBox->new($self->{nb_individual_pane}, wxID_ANY, "Name and Address" );
+$self->{lbl_address}->SetMinSize(Wx::Size->new(-1, 70));
+$self->{lbl_address}->SetFont(Wx::Font->new(12, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, 0, "Courier New"));
+$self->{sz_name_address}->Add($self->{lbl_address}, 1, wxALL|wxEXPAND, 5);
+
 $self->{panel_hide_notes} = Wx::Panel->new($self->{nb_individual_pane}, wxID_ANY);
+$self->{sz_name_addr_weight}->Add($self->{panel_hide_notes}, 0, wxEXPAND|wxRIGHT, 5);
+
+$self->{sz_panel_notes} = Wx::StaticBoxSizer->new(Wx::StaticBox->new($self->{panel_hide_notes}, wxID_ANY, "Notes"), wxVERTICAL);
+
 $self->{panel_notes} = Wx::Panel->new($self->{panel_hide_notes}, wxID_ANY);
+$self->{sz_panel_notes}->Add($self->{panel_notes}, 1, wxALL|wxEXPAND, 5);
+
+$self->{sizer_7} = Wx::BoxSizer->new(wxVERTICAL);
+
 $self->{lbl_notes} = Wx::StaticText->new($self->{panel_notes}, wxID_ANY, "M - Multiple Orders Paid Separately\nN - Note From Buyer:\n       Ship it right away!\n");
-$self->{sz_panel_notes_staticbox} = Wx::StaticBox->new($self->{panel_hide_notes}, wxID_ANY, "Notes" );
+$self->{lbl_notes}->SetFont(Wx::Font->new(12, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, 0, "Courier New"));
+$self->{sizer_7}->Add($self->{lbl_notes}, 0, wxALL|wxEXPAND, 5);
+
+$self->{sz_weight_mail} = Wx::BoxSizer->new(wxVERTICAL);
+$self->{sz_name_addr_weight}->Add($self->{sz_weight_mail}, 0, wxEXPAND, 0);
+
+$self->{sz_weight} = Wx::StaticBoxSizer->new(Wx::StaticBox->new($self->{nb_individual_pane}, wxID_ANY, "Weight"), wxVERTICAL);
+$self->{sz_weight_mail}->Add($self->{sz_weight}, 0, wxBOTTOM|wxEXPAND|wxRIGHT, 10);
+
+$self->{gsz_lbs_oz} = Wx::FlexGridSizer->new(2, 2, 2, 2);
+$self->{sz_weight}->Add($self->{gsz_lbs_oz}, 1, wxALIGN_RIGHT|wxALL, 5);
+
 $self->{lbl_lbs} = Wx::StaticText->new($self->{nb_individual_pane}, wxID_ANY, "Lbs.");
+$self->{gsz_lbs_oz}->Add($self->{lbl_lbs}, 0, 0, 0);
+
 $self->{lbl_oz} = Wx::StaticText->new($self->{nb_individual_pane}, wxID_ANY, "Oz.");
+$self->{gsz_lbs_oz}->Add($self->{lbl_oz}, 0, 0, 0);
+
 $self->{tc_lbs} = Wx::TextCtrl->new($self->{nb_individual_pane}, wxID_ANY, "0", wxDefaultPosition, wxDefaultSize, wxTE_AUTO_URL|wxTE_RIGHT);
+$self->{tc_lbs}->SetMinSize(Wx::Size->new(80, 40));
+$self->{tc_lbs}->SetFont(Wx::Font->new(14, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, 0, ""));
+$self->{tc_lbs}->Enable(0);
+$self->{gsz_lbs_oz}->Add($self->{tc_lbs}, 0, wxALIGN_RIGHT|wxBOTTOM|wxRIGHT|wxTOP, 5);
+
 $self->{tc_oz} = Wx::TextCtrl->new($self->{nb_individual_pane}, wxID_ANY, "0", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER|wxTE_RIGHT);
-$self->{sz_weight_staticbox} = Wx::StaticBox->new($self->{nb_individual_pane}, wxID_ANY, "Weight" );
+$self->{tc_oz}->SetMinSize(Wx::Size->new(80, 40));
+$self->{tc_oz}->SetFont(Wx::Font->new(14, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, 0, "MS Shell Dlg 2"));
+$self->{tc_oz}->Enable(0);
+$self->{gsz_lbs_oz}->Add($self->{tc_oz}, 0, wxALIGN_RIGHT|wxBOTTOM|wxRIGHT|wxTOP, 5);
+
+$self->{sz_mail_hideButton} = Wx::BoxSizer->new(wxHORIZONTAL);
+$self->{sz_weight_mail}->Add($self->{sz_mail_hideButton}, 0, wxBOTTOM|wxLEFT|wxRIGHT, 10);
+
 $self->{choice_mailclass} = Wx::Choice->new($self->{nb_individual_pane}, wxID_ANY, wxDefaultPosition, wxDefaultSize, ["First Class", "Priority", "Media Mail", "Parcel Post"], );
+$self->{choice_mailclass}->SetMinSize(Wx::Size->new(120, 28));
+$self->{choice_mailclass}->SetFont(Wx::Font->new(12, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, 0, "MS Shell Dlg 2"));
+$self->{choice_mailclass}->SetSelection(0);
+$self->{sz_mail_hideButton}->Add($self->{choice_mailclass}, 1, wxEXPAND|wxRIGHT, 5);
+
 $self->{btn_send_email} = Wx::Button->new($self->{nb_individual_pane}, wxID_ANY, "Send Email");
+$self->{btn_send_email}->SetMinSize(Wx::Size->new(-1, 28));
+$self->{sz_mail_hideButton}->Add($self->{btn_send_email}, 0, wxEXPAND|wxRIGHT, 5);
+
 $self->{btn_hidenotes} = Wx::Button->new($self->{nb_individual_pane}, wxID_ANY, "Hide Notes");
+$self->{btn_hidenotes}->SetMinSize(Wx::Size->new(-1, 28));
+$self->{btn_hidenotes}->Show(0);
+$self->{sz_mail_hideButton}->Add($self->{btn_hidenotes}, 0, wxEXPAND, 0);
+
+$self->{sz_packaging_type} = Wx::StaticBoxSizer->new(Wx::StaticBox->new($self->{nb_individual_pane}, wxID_ANY, "Single Unit Packaging Details"), wxHORIZONTAL);
+$self->{sz_weight_mail}->Add($self->{sz_packaging_type}, 1, wxBOTTOM|wxEXPAND|wxRIGHT, 10);
+
+$self->{sz_pkg_details} = Wx::BoxSizer->new(wxVERTICAL);
+$self->{sz_packaging_type}->Add($self->{sz_pkg_details}, 1, 0, 0);
+
 $self->{dd_packaging} = Wx::Choice->new($self->{nb_individual_pane}, wxID_ANY, wxDefaultPosition, wxDefaultSize, ["Choose Package Type"], );
+$self->{dd_packaging}->SetFont(Wx::Font->new(12, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, 0, "MS Shell Dlg 2"));
+$self->{dd_packaging}->SetSelection(0);
+$self->{sz_pkg_details}->Add($self->{dd_packaging}, 1, wxEXPAND, 0);
+
+$self->{sz_pkg_details}->Add(5, 5, 0, 0, 0);
+
 $self->{dd_bubble_wrap} = Wx::Choice->new($self->{nb_individual_pane}, wxID_ANY, wxDefaultPosition, wxDefaultSize, ["Choose Bubble Wrap", "Y", "N"], );
+$self->{dd_bubble_wrap}->SetFont(Wx::Font->new(12, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, 0, "MS Shell Dlg 2"));
+$self->{dd_bubble_wrap}->SetSelection(0);
+$self->{sz_pkg_details}->Add($self->{dd_bubble_wrap}, 1, wxEXPAND, 0);
+
 $self->{btn_save_pkg} = Wx::Button->new($self->{nb_individual_pane}, wxID_ANY, "SAVE");
-$self->{sz_packaging_type_staticbox} = Wx::StaticBox->new($self->{nb_individual_pane}, wxID_ANY, "Single Unit Packaging Details" );
+$self->{btn_save_pkg}->SetMinSize(Wx::Size->new(50, -1));
+$self->{btn_save_pkg}->SetFont(Wx::Font->new(12, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, 0, "MS Shell Dlg 2"));
+$self->{sz_packaging_type}->Add($self->{btn_save_pkg}, 0, wxEXPAND|wxLEFT|wxRIGHT, 5);
+
+$self->{sz_items} = Wx::StaticBoxSizer->new(Wx::StaticBox->new($self->{nb_individual_pane}, wxID_ANY, "Items"), wxVERTICAL);
+$self->{sz_package_details}->Add($self->{sz_items}, 1, wxALL|wxEXPAND, 5);
+
 $self->{panel_griditems} = Wx::ScrolledWindow->new($self->{nb_individual_pane}, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
+$self->{panel_griditems}->SetBackgroundColour(Wx::Colour->new(211, 236, 240));
+$self->{panel_griditems}->SetScrollRate(10, 10);
+$self->{sz_items}->Add($self->{panel_griditems}, 1, wxEXPAND, 5);
+
+$self->{sz_grid_items} = Wx::BoxSizer->new(wxHORIZONTAL);
+
 $self->{grid_items} = Wx::Grid->new($self->{panel_griditems}, wxID_ANY);
-$self->{sz_items_staticbox} = Wx::StaticBox->new($self->{nb_individual_pane}, wxID_ANY, "Items" );
-$self->{nb_batch_pane} = Wx::Panel->new($self->{nb_main}, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSIMPLE_BORDER|wxTAB_TRAVERSAL);
+$self->{grid_items}->CreateGrid(5, 7);
+$self->{grid_items}->SetRowLabelSize(1);
+$self->{grid_items}->EnableEditing(0);
+$self->{grid_items}->EnableDragRowSize(0);
+$self->{grid_items}->EnableDragGridSize(0);
+$self->{grid_items}->SetColLabelValue(0, "Picture");
+$self->{grid_items}->SetColSize(0, 150);
+$self->{grid_items}->SetColLabelValue(1, "Qty");
+$self->{grid_items}->SetColSize(1, 40);
+$self->{grid_items}->SetColLabelValue(2, "Variation");
+$self->{grid_items}->SetColSize(2, 150);
+$self->{grid_items}->SetColLabelValue(3, "Title");
+$self->{grid_items}->SetColSize(3, 350);
+$self->{grid_items}->SetColLabelValue(4, "Packaging");
+$self->{grid_items}->SetColSize(4, 80);
+$self->{grid_items}->SetColLabelValue(5, "Bubble Wrap");
+$self->{grid_items}->SetColSize(5, 80);
+$self->{grid_items}->SetColLabelValue(6, "Packaged Weight");
+$self->{grid_items}->SetFont(Wx::Font->new(12, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, 0, "MS Shell Dlg 2"));
+$self->{sz_grid_items}->Add($self->{grid_items}, 1, wxALL|wxEXPAND, 10);
+
+$self->{nb_batch_pane} = Wx::Panel->new($self->{nb_main}, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_SIMPLE|wxTAB_TRAVERSAL);
+$self->{nb_main}->AddPage($self->{nb_batch_pane}, "Batch");
+
+$self->{sizer_nb_dom_pane} = Wx::BoxSizer->new(wxHORIZONTAL);
+
 $self->{grid_batch} = Wx::Grid->new($self->{nb_batch_pane}, wxID_ANY);
-$self->{nb_configuration} = Wx::ScrolledWindow->new($self->{nb_main}, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSIMPLE_BORDER|wxTAB_TRAVERSAL);
+$self->{grid_batch}->CreateGrid(20, 4);
+$self->{grid_batch}->SetColLabelValue(0, "ID");
+$self->{grid_batch}->SetColLabelValue(1, "Description");
+$self->{grid_batch}->SetColLabelValue(2, "Weight Lbs");
+$self->{grid_batch}->SetColLabelValue(3, "Weight Oz");
+$self->{grid_batch}->SetBackgroundColour(Wx::Colour->new(153, 255, 127));
+$self->{sizer_nb_dom_pane}->Add($self->{grid_batch}, 1, wxBOTTOM|wxEXPAND|wxTOP, 5);
+
+$self->{nb_configuration} = Wx::ScrolledWindow->new($self->{nb_main}, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_SIMPLE|wxTAB_TRAVERSAL);
+$self->{nb_configuration}->SetScrollRate(10, 10);
+$self->{nb_main}->AddPage($self->{nb_configuration}, "Configuration");
+
+$self->{sizer_1} = Wx::BoxSizer->new(wxHORIZONTAL);
+
+$self->{sizer_2} = Wx::BoxSizer->new(wxVERTICAL);
+$self->{sizer_1}->Add($self->{sizer_2}, 0, wxEXPAND|wxLEFT|wxTOP, 5);
+
 $self->{lbl_configuration_file} = Wx::StaticText->new($self->{nb_configuration}, wxID_ANY, "Configuruation File:", wxDefaultPosition, wxDefaultSize, wxALIGN_RIGHT);
+$self->{lbl_configuration_file}->SetMinSize(Wx::Size->new(-1, 21));
+$self->{sizer_2}->Add($self->{lbl_configuration_file}, 0, wxALL|wxEXPAND, 3);
+
 $self->{lbl_environment} = Wx::StaticText->new($self->{nb_configuration}, wxID_ANY, "Environment:", wxDefaultPosition, wxDefaultSize, wxALIGN_RIGHT);
+$self->{lbl_environment}->SetMinSize(Wx::Size->new(-1, 21));
+$self->{sizer_2}->Add($self->{lbl_environment}, 0, wxALL|wxEXPAND, 3);
+
 $self->{lbl_database} = Wx::StaticText->new($self->{nb_configuration}, wxID_ANY, "Database:", wxDefaultPosition, wxDefaultSize, wxALIGN_RIGHT);
+$self->{lbl_database}->SetMinSize(Wx::Size->new(-1, 21));
+$self->{sizer_2}->Add($self->{lbl_database}, 0, wxALL|wxEXPAND, 3);
+
 $self->{lbl_database_type} = Wx::StaticText->new($self->{nb_configuration}, wxID_ANY, "Database Type:", wxDefaultPosition, wxDefaultSize, wxALIGN_RIGHT);
+$self->{lbl_database_type}->SetMinSize(Wx::Size->new(-1, 21));
+$self->{sizer_2}->Add($self->{lbl_database_type}, 0, wxALL|wxEXPAND, 3);
+
 $self->{lbl_user} = Wx::StaticText->new($self->{nb_configuration}, wxID_ANY, "User:", wxDefaultPosition, wxDefaultSize, wxALIGN_RIGHT);
+$self->{lbl_user}->SetMinSize(Wx::Size->new(-1, 21));
+$self->{sizer_2}->Add($self->{lbl_user}, 0, wxALL|wxEXPAND, 3);
+
 $self->{lbl_password} = Wx::StaticText->new($self->{nb_configuration}, wxID_ANY, "Password:", wxDefaultPosition, wxDefaultSize, wxALIGN_RIGHT);
+$self->{lbl_password}->SetMinSize(Wx::Size->new(-1, 21));
+$self->{sizer_2}->Add($self->{lbl_password}, 0, wxALL|wxEXPAND, 3);
+
 $self->{lbl_installed_location} = Wx::StaticText->new($self->{nb_configuration}, wxID_ANY, "Installed Location:", wxDefaultPosition, wxDefaultSize, wxALIGN_RIGHT);
+$self->{lbl_installed_location}->SetMinSize(Wx::Size->new(-1, 21));
+$self->{sizer_2}->Add($self->{lbl_installed_location}, 0, wxALL|wxEXPAND, 3);
+
+$self->{sizer_3} = Wx::BoxSizer->new(wxVERTICAL);
+$self->{sizer_1}->Add($self->{sizer_3}, 0, wxEXPAND|wxTOP, 5);
+
 $self->{btn_config_file_chooser} = Wx::Button->new($self->{nb_configuration}, wxID_ANY, "Choose File");
+$self->{btn_config_file_chooser}->SetMinSize(Wx::Size->new(-1, 21));
+$self->{sizer_3}->Add($self->{btn_config_file_chooser}, 0, wxALL, 3);
+
 $self->{dd_config_environment} = Wx::Choice->new($self->{nb_configuration}, wxID_ANY, wxDefaultPosition, wxDefaultSize, ["Choose Environment"], );
+$self->{dd_config_environment}->SetMinSize(Wx::Size->new(-1, 21));
+$self->{dd_config_environment}->SetSelection(0);
+$self->{sizer_3}->Add($self->{dd_config_environment}, 0, wxALL, 3);
+
 $self->{tc_config_database} = Wx::TextCtrl->new($self->{nb_configuration}, wxID_ANY, "");
+$self->{tc_config_database}->SetMinSize(Wx::Size->new(300, 21));
+$self->{sizer_3}->Add($self->{tc_config_database}, 0, wxALL, 3);
+
 $self->{tc_config_db_type} = Wx::TextCtrl->new($self->{nb_configuration}, wxID_ANY, "");
+$self->{tc_config_db_type}->SetMinSize(Wx::Size->new(300, 21));
+$self->{sizer_3}->Add($self->{tc_config_db_type}, 0, wxALL, 3);
+
 $self->{tc_config_user} = Wx::TextCtrl->new($self->{nb_configuration}, wxID_ANY, "");
+$self->{tc_config_user}->SetMinSize(Wx::Size->new(300, 21));
+$self->{sizer_3}->Add($self->{tc_config_user}, 0, wxALL, 3);
+
 $self->{tc_config_password} = Wx::TextCtrl->new($self->{nb_configuration}, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxTE_PASSWORD);
+$self->{tc_config_password}->SetMinSize(Wx::Size->new(300, 21));
+$self->{sizer_3}->Add($self->{tc_config_password}, 0, wxALL, 3);
+
 $self->{tc_config_installed_location} = Wx::TextCtrl->new($self->{nb_configuration}, wxID_ANY, "");
+$self->{tc_config_installed_location}->SetMinSize(Wx::Size->new(300, 21));
+$self->{sizer_3}->Add($self->{tc_config_installed_location}, 0, wxALL, 3);
+
 $self->{btn_config_test} = Wx::Button->new($self->{nb_configuration}, wxID_ANY, "Test Connection");
+$self->{btn_config_test}->SetMinSize(Wx::Size->new(-1, 21));
+$self->{sizer_3}->Add($self->{btn_config_test}, 0, wxALL, 3);
+
 $self->{nb_log} = Wx::ScrolledWindow->new($self->{nb_main}, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
+$self->{nb_log}->SetScrollRate(10, 10);
+$self->{nb_main}->AddPage($self->{nb_log}, "Log");
+
+$self->{sizer_4} = Wx::BoxSizer->new(wxHORIZONTAL);
+
 $self->{lbl_log} = Wx::StaticText->new($self->{nb_log}, wxID_ANY, "Log Information...");
+$self->{lbl_log}->SetMinSize(Wx::Size->new(-1, 1000));
+$self->{sizer_4}->Add($self->{lbl_log}, 0, wxALL|wxEXPAND, 5);
+
 $self->{nb_misc} = Wx::Panel->new($self->{nb_main}, wxID_ANY);
+$self->{nb_main}->AddPage($self->{nb_misc}, "Misc");
+
+$self->{sizer_5} = Wx::BoxSizer->new(wxVERTICAL);
+
 $self->{tc_name_address} = Wx::TextCtrl->new($self->{nb_misc}, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxTE_MULTILINE);
+$self->{tc_name_address}->SetMinSize(Wx::Size->new(-1, 70));
+$self->{tc_name_address}->SetFont(Wx::Font->new(20, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, 0, ""));
+$self->{sizer_5}->Add($self->{tc_name_address}, 1, wxALL|wxEXPAND, 5);
+
+$self->{nb_admin} = Wx::Panel->new($self->{nb_main}, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_SIMPLE|wxTAB_TRAVERSAL);
+$self->{nb_main}->AddPage($self->{nb_admin}, "Admin");
+
+$self->{sizer_6} = Wx::BoxSizer->new(wxVERTICAL);
+
+$self->{btn_admin_upd_skus} = Wx::Button->new($self->{nb_admin}, wxID_ANY, "Click here to\nAssign/Verify SKUS (Custom Labels)");
+$self->{btn_admin_upd_skus}->SetMinSize(Wx::Size->new(280, 60));
+$self->{btn_admin_upd_skus}->SetFont(Wx::Font->new(12, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, 0, ""));
+$self->{sizer_6}->Add($self->{btn_admin_upd_skus}, 0, wxALL, 20);
+
+my $lbl_admin = Wx::StaticText->new($self->{nb_admin}, wxID_ANY, "lbl_admin output", wxDefaultPosition, wxDefaultSize, wxALIGN_LEFT);
+$lbl_admin->SetFont(Wx::Font->new(12, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, 0, ""));
+$self->{sizer_6}->Add($lbl_admin, 0, 0, 0);
+
+$self->{sizer_buttons} = Wx::BoxSizer->new(wxHORIZONTAL);
+$self->{sizer_main}->Add($self->{sizer_buttons}, 0, wxEXPAND, 0);
+
 $self->{image_logo} = Wx::StaticBitmap->new($self, wxID_ANY, Wx::Bitmap->new("images/theteachingtoyboxlogo.png", wxBITMAP_TYPE_ANY), wxDefaultPosition, wxDefaultSize, wxFULL_REPAINT_ON_RESIZE);
-$self->{btn_stage} = Wx::BitmapButton->new($self, wxID_ANY, Wx::Bitmap->new("images/stage_red.png", wxBITMAP_TYPE_ANY));
-$self->{btn_prev} = Wx::BitmapButton->new($self, wxID_ANY, Wx::Bitmap->new("images/prev_red.png", wxBITMAP_TYPE_ANY));
-$self->{btn_next} = Wx::BitmapButton->new($self, wxID_ANY, Wx::Bitmap->new("images/next_red.png", wxBITMAP_TYPE_ANY));
-$self->{btn_print} = Wx::BitmapButton->new($self, wxID_ANY, Wx::Bitmap->new("images/print_red.png", wxBITMAP_TYPE_ANY));
+$self->{image_logo}->SetBackgroundColour(Wx::Colour->new(255, 255, 255));
+$self->{sizer_buttons}->Add($self->{image_logo}, 0, wxEXPAND|wxFIXED_MINSIZE, 3);
 
-$self->__set_properties();
-$self->__do_layout();
+$self->{sizer_buttons}->Add(20, 20, 1, wxEXPAND, 0);
 
-Wx::Event::EVT_RADIOBOX($self, $self->{rb_package_display}->GetId, \&rb_pkg_disp_evtRadioBox);
-Wx::Event::EVT_TEXT_ENTER($self, $self->{tc_advDays}->GetId, \&tc_advDays_evtTextEnter);
-Wx::Event::EVT_TEXT($self, $self->{tc_advDays}->GetId, \&tc_advDays_evtTextChanged);
-Wx::Event::EVT_TEXT($self, $self->{tc_lbs}->GetId, \&tc_lbs_evtTextChanged);
-Wx::Event::EVT_TEXT_ENTER($self, $self->{tc_oz}->GetId, \&tc_oz_evtTextEnter);
-Wx::Event::EVT_TEXT($self, $self->{tc_oz}->GetId, \&tc_oz_evtTextChanged);
-Wx::Event::EVT_CHOICE($self, $self->{choice_mailclass}->GetId, \&choice_mailclass_evtChoice);
-Wx::Event::EVT_BUTTON($self, $self->{btn_send_email}->GetId, \&evt_btn_send_email_evtButton);
-Wx::Event::EVT_BUTTON($self, $self->{btn_hidenotes}->GetId, \&btn_hidenotes_evtButton);
-Wx::Event::EVT_BUTTON($self, $self->{btn_save_pkg}->GetId, \&btn_save_pkg_evtClick);
-Wx::Event::EVT_GRID_CMD_CELL_CHANGE($self, $self->{grid_batch}->GetId, \&evt_grid_cell_changed);
-Wx::Event::EVT_GRID_CMD_SELECT_CELL($self, $self->{grid_batch}->GetId, \&evt_grid_cell_select);
-Wx::Event::EVT_BUTTON($self, $self->{btn_config_file_chooser}->GetId, \&btn_config_file_chooser_onClick);
-Wx::Event::EVT_CHOICE($self, $self->{dd_config_environment}->GetId, \&dd_config_environment_evtChoice);
-Wx::Event::EVT_BUTTON($self, $self->{btn_config_test}->GetId, \&btn_config_test_onClick);
-Wx::Event::EVT_NOTEBOOK_PAGE_CHANGED($self, $self->{nb_main}->GetId, \&nb_main_evtPageChanged);
-Wx::Event::EVT_BUTTON($self, $self->{btn_stage}->GetId, \&btn_stage_onClick);
-Wx::Event::EVT_BUTTON($self, $self->{btn_prev}->GetId, \&btn_prev_onClick);
-Wx::Event::EVT_BUTTON($self, $self->{btn_next}->GetId, \&btn_next_onClick);
-Wx::Event::EVT_BUTTON($self, $self->{btn_print}->GetId, \&btn_print_onClick);
+$self->{btn_stage} = Wx::BitmapButton->new($self, wxID_ANY, Wx::Bitmap->new("images/stage_red.png", wxBITMAP_TYPE_ANY), wxDefaultPosition, wxDefaultSize, wxBORDER_NONE|wxBU_RIGHT);
+$self->{btn_stage}->SetMinSize(Wx::Size->new(75, 23));
+$self->{btn_stage}->SetBackgroundColour(Wx::Colour->new(255, 255, 255));
+$self->{btn_stage}->Enable(0);
+$self->{sizer_buttons}->Add($self->{btn_stage}, 0, wxALL|wxEXPAND, 2);
+
+$self->{btn_prev} = Wx::BitmapButton->new($self, wxID_ANY, Wx::Bitmap->new("images/prev_red.png", wxBITMAP_TYPE_ANY), wxDefaultPosition, wxDefaultSize, wxBORDER_NONE|wxBU_RIGHT);
+$self->{btn_prev}->SetMinSize(Wx::Size->new(75, 23));
+$self->{btn_prev}->SetBackgroundColour(Wx::Colour->new(255, 255, 255));
+$self->{btn_prev}->Enable(0);
+$self->{sizer_buttons}->Add($self->{btn_prev}, 0, wxALL|wxEXPAND, 2);
+
+$self->{btn_next} = Wx::BitmapButton->new($self, wxID_ANY, Wx::Bitmap->new("images/next_red.png", wxBITMAP_TYPE_ANY), wxDefaultPosition, wxDefaultSize, wxBORDER_NONE|wxBU_RIGHT);
+$self->{btn_next}->SetMinSize(Wx::Size->new(75, 23));
+$self->{btn_next}->SetBackgroundColour(Wx::Colour->new(255, 255, 255));
+$self->{btn_next}->Enable(0);
+$self->{sizer_buttons}->Add($self->{btn_next}, 0, wxALL|wxEXPAND, 2);
+
+$self->{btn_print} = Wx::BitmapButton->new($self, wxID_ANY, Wx::Bitmap->new("images/print_red.png", wxBITMAP_TYPE_ANY), wxDefaultPosition, wxDefaultSize, wxBORDER_NONE|wxBU_RIGHT);
+$self->{btn_print}->SetMinSize(Wx::Size->new(75, 23));
+$self->{btn_print}->SetBackgroundColour(Wx::Colour->new(255, 255, 255));
+$self->{btn_print}->Enable(0);
+$self->{sizer_buttons}->Add($self->{btn_print}, 0, wxALL|wxEXPAND, 2);
+
+$self->{nb_admin}->SetSizer($self->{sizer_6});
+
+$self->{nb_misc}->SetSizer($self->{sizer_5});
+
+$self->{nb_log}->SetSizer($self->{sizer_4});
+
+$self->{nb_configuration}->SetSizer($self->{sizer_1});
+
+$self->{nb_batch_pane}->SetSizer($self->{sizer_nb_dom_pane});
+
+$self->{panel_griditems}->SetSizer($self->{sz_grid_items});
+
+$self->{panel_notes}->SetSizer($self->{sizer_7});
+
+$self->{panel_hide_notes}->SetSizer($self->{sz_panel_notes});
+
+$self->{nb_individual_pane}->SetSizer($self->{sz_package_details});
+
+$self->{panel_header}->SetSizer($self->{sz_status_disp_toggle});
+
+$self->SetSizer($self->{sizer_main});
+
+$self->Layout();
+$self->Centre();
+Wx::Event::EVT_RADIOBOX($self, $self->{rb_package_display}->GetId, $self->can('rb_pkg_disp_evtRadioBox'));
+Wx::Event::EVT_TEXT($self, $self->{tc_advDays}->GetId, $self->can('tc_advDays_evtTextChanged'));
+Wx::Event::EVT_TEXT_ENTER($self, $self->{tc_advDays}->GetId, $self->can('tc_advDays_evtTextEnter'));
+Wx::Event::EVT_NOTEBOOK_PAGE_CHANGED($self, $self->{nb_main}->GetId, $self->can('nb_main_evtPageChanged'));
+Wx::Event::EVT_TEXT($self, $self->{tc_lbs}->GetId, $self->can('tc_lbs_evtTextChanged'));
+Wx::Event::EVT_TEXT($self, $self->{tc_oz}->GetId, $self->can('tc_oz_evtTextChanged'));
+Wx::Event::EVT_TEXT_ENTER($self, $self->{tc_oz}->GetId, $self->can('tc_oz_evtTextEnter'));
+Wx::Event::EVT_CHOICE($self, $self->{choice_mailclass}->GetId, $self->can('choice_mailclass_evtChoice'));
+Wx::Event::EVT_BUTTON($self, $self->{btn_send_email}->GetId, $self->can('evt_btn_send_email_evtButton'));
+Wx::Event::EVT_BUTTON($self, $self->{btn_hidenotes}->GetId, $self->can('btn_hidenotes_evtButton'));
+Wx::Event::EVT_BUTTON($self, $self->{btn_save_pkg}->GetId, $self->can('btn_save_pkg_evtClick'));
+Wx::Event::EVT_GRID_CMD_CELL_CHANGE($self, $self->{grid_batch}->GetId, $self->can('evt_grid_cell_changed'));
+Wx::Event::EVT_GRID_CMD_SELECT_CELL($self, $self->{grid_batch}->GetId, $self->can('evt_grid_cell_select'));
+Wx::Event::EVT_BUTTON($self, $self->{btn_config_file_chooser}->GetId, $self->can('btn_config_file_chooser_onClick'));
+Wx::Event::EVT_CHOICE($self, $self->{dd_config_environment}->GetId, $self->can('dd_config_environment_evtChoice'));
+Wx::Event::EVT_BUTTON($self, $self->{btn_config_test}->GetId, $self->can('btn_config_test_onClick'));
+Wx::Event::EVT_BUTTON($self, $self->{btn_admin_upd_skus}->GetId, $self->can('btn_admin_upd_skus_onClick'));
+Wx::Event::EVT_BUTTON($self, $self->{btn_stage}->GetId, $self->can('btn_stage_onClick'));
+Wx::Event::EVT_BUTTON($self, $self->{btn_prev}->GetId, $self->can('btn_prev_onClick'));
+Wx::Event::EVT_BUTTON($self, $self->{btn_next}->GetId, $self->can('btn_next_onClick'));
+Wx::Event::EVT_BUTTON($self, $self->{btn_print}->GetId, $self->can('btn_print_onClick'));
 
 # end wxGlade
 
@@ -317,240 +623,6 @@ Wx::Event::EVT_BUTTON($self, $self->{btn_print}->GetId, \&btn_print_onClick);
 	return $self;
 
 } # end new()
-
-
-################################################################################
-sub __set_properties {
-	my $self = shift;
-
-# begin wxGlade: MyFrame::__set_properties
-$self->SetTitle("The Teaching Toy Box - SHIP IT!");
-$self->SetSize(Wx::Size->new(1325, 904));
-$self->SetBackgroundColour(Wx::Colour->new(255, 255, 255));
-$self->{statusbar}->SetStatusWidths(-1);
-
-# statusbar fields
-my( @statusbar_fields ) = (
-    "Welcome to the new and improved SHIP IT 2.0",
-);
-
-if( @statusbar_fields ) {
-    $self->{statusbar}->SetStatusText($statusbar_fields[$_], $_)
-    for 0 .. $#statusbar_fields ;
-}
-$self->{rb_package_display}->SetSelection(0);
-$self->{lbl_status}->SetMinSize(Wx::Size->new(-1, 29));
-$self->{lbl_status}->SetBackgroundColour(Wx::Colour->new(211, 236, 240));
-$self->{lbl_status}->SetForegroundColour(Wx::Colour->new(255, 255, 255));
-$self->{lbl_status}->SetFont(Wx::Font->new(18, wxDEFAULT, wxNORMAL, wxBOLD, 0, ""));
-$self->{panel_header}->SetBackgroundColour(Wx::Colour->new(211, 236, 240));
-$self->{lbl_buyer}->SetMinSize(Wx::Size->new(-1,30));
-$self->{lbl_buyer}->SetFont(Wx::Font->new(24, wxMODERN, wxNORMAL, wxBOLD, 0, "Courier New"));
-$self->{lbl_address}->SetMinSize(Wx::Size->new(-1, 70));
-$self->{lbl_address}->SetFont(Wx::Font->new(12, wxMODERN, wxNORMAL, wxBOLD, 0, "Courier New"));
-$self->{lbl_notes}->SetFont(Wx::Font->new(12, wxMODERN, wxNORMAL, wxBOLD, 0, "Courier New"));
-$self->{tc_lbs}->SetMinSize(Wx::Size->new(80, 40));
-$self->{tc_lbs}->SetFont(Wx::Font->new(14, wxDEFAULT, wxNORMAL, wxNORMAL, 0, ""));
-$self->{tc_lbs}->Enable(0);
-$self->{tc_oz}->SetMinSize(Wx::Size->new(80, 40));
-$self->{tc_oz}->SetFont(Wx::Font->new(14, wxDEFAULT, wxNORMAL, wxNORMAL, 0, "MS Shell Dlg 2"));
-$self->{tc_oz}->Enable(0);
-$self->{choice_mailclass}->SetMinSize(Wx::Size->new(120, 28));
-$self->{choice_mailclass}->SetFont(Wx::Font->new(12, wxDEFAULT, wxNORMAL, wxNORMAL, 0, "MS Shell Dlg 2"));
-$self->{choice_mailclass}->SetSelection(0);
-$self->{btn_send_email}->SetMinSize(Wx::Size->new(-1, 28));
-$self->{btn_hidenotes}->SetMinSize(Wx::Size->new(-1, 28));
-$self->{btn_hidenotes}->Show(0);
-$self->{dd_packaging}->SetFont(Wx::Font->new(12, wxDEFAULT, wxNORMAL, wxNORMAL, 0, "MS Shell Dlg 2"));
-$self->{dd_packaging}->SetSelection(0);
-$self->{dd_bubble_wrap}->SetFont(Wx::Font->new(12, wxDEFAULT, wxNORMAL, wxNORMAL, 0, "MS Shell Dlg 2"));
-$self->{dd_bubble_wrap}->SetSelection(0);
-$self->{btn_save_pkg}->SetMinSize(Wx::Size->new(50, -1));
-$self->{btn_save_pkg}->SetFont(Wx::Font->new(12, wxDEFAULT, wxNORMAL, wxNORMAL, 0, "MS Shell Dlg 2"));
-$self->{grid_items}->CreateGrid(5, 7);
-$self->{grid_items}->SetRowLabelSize(1);
-$self->{grid_items}->EnableEditing(0);
-$self->{grid_items}->EnableDragRowSize(0);
-$self->{grid_items}->EnableDragGridSize(0);
-$self->{grid_items}->SetSelectionMode(wxGridSelectCells);
-$self->{grid_items}->SetColLabelValue(0, "Picture");
-$self->{grid_items}->SetColSize(0, 150);
-$self->{grid_items}->SetColLabelValue(1, "Qty");
-$self->{grid_items}->SetColSize(1, 40);
-$self->{grid_items}->SetColLabelValue(2, "Variation");
-$self->{grid_items}->SetColSize(2, 150);
-$self->{grid_items}->SetColLabelValue(3, "Title");
-$self->{grid_items}->SetColSize(3, 350);
-$self->{grid_items}->SetColLabelValue(4, "Packaging");
-$self->{grid_items}->SetColSize(4, 80);
-$self->{grid_items}->SetColLabelValue(5, "Bubble Wrap");
-$self->{grid_items}->SetColSize(5, 80);
-$self->{grid_items}->SetColLabelValue(6, "Packaged Weight");
-$self->{grid_items}->SetFont(Wx::Font->new(12, wxDEFAULT, wxNORMAL, wxNORMAL, 0, "MS Shell Dlg 2"));
-$self->{panel_griditems}->SetBackgroundColour(Wx::Colour->new(211, 236, 240));
-$self->{panel_griditems}->SetScrollRate(10, 10);
-$self->{grid_batch}->CreateGrid(20, 4);
-$self->{grid_batch}->SetSelectionMode(wxGridSelectCells);
-$self->{grid_batch}->SetColLabelValue(0, "ID");
-$self->{grid_batch}->SetColLabelValue(1, "Description");
-$self->{grid_batch}->SetColLabelValue(2, "Weight Lbs");
-$self->{grid_batch}->SetColLabelValue(3, "Weight Oz");
-$self->{grid_batch}->SetBackgroundColour(Wx::Colour->new(153, 255, 127));
-$self->{lbl_configuration_file}->SetMinSize(Wx::Size->new(-1, 21));
-$self->{lbl_environment}->SetMinSize(Wx::Size->new(-1, 21));
-$self->{lbl_database}->SetMinSize(Wx::Size->new(-1, 21));
-$self->{lbl_database_type}->SetMinSize(Wx::Size->new(-1, 21));
-$self->{lbl_user}->SetMinSize(Wx::Size->new(-1, 21));
-$self->{lbl_password}->SetMinSize(Wx::Size->new(-1, 21));
-$self->{lbl_installed_location}->SetMinSize(Wx::Size->new(-1, 21));
-$self->{btn_config_file_chooser}->SetMinSize(Wx::Size->new(-1, 21));
-$self->{dd_config_environment}->SetMinSize(Wx::Size->new(-1, 21));
-$self->{dd_config_environment}->SetSelection(0);
-$self->{tc_config_database}->SetMinSize(Wx::Size->new(300, 21));
-$self->{tc_config_db_type}->SetMinSize(Wx::Size->new(300, 21));
-$self->{tc_config_user}->SetMinSize(Wx::Size->new(300, 21));
-$self->{tc_config_password}->SetMinSize(Wx::Size->new(300, 21));
-$self->{tc_config_installed_location}->SetMinSize(Wx::Size->new(300, 21));
-$self->{btn_config_test}->SetMinSize(Wx::Size->new(-1, 21));
-$self->{nb_configuration}->SetScrollRate(10, 10);
-$self->{lbl_log}->SetMinSize(Wx::Size->new(-1, 1000));
-$self->{nb_log}->SetScrollRate(10, 10);
-$self->{tc_name_address}->SetMinSize(Wx::Size->new(-1, 70));
-$self->{tc_name_address}->SetFont(Wx::Font->new(20, wxMODERN, wxNORMAL, wxNORMAL, 0, ""));
-$self->{image_logo}->SetBackgroundColour(Wx::Colour->new(255, 255, 255));
-$self->{btn_stage}->SetMinSize(Wx::Size->new(75, 23));
-$self->{btn_stage}->SetBackgroundColour(Wx::Colour->new(255, 255, 255));
-$self->{btn_stage}->Enable(0);
-$self->{btn_prev}->SetMinSize(Wx::Size->new(75, 23));
-$self->{btn_prev}->SetBackgroundColour(Wx::Colour->new(255, 255, 255));
-$self->{btn_prev}->Enable(0);
-$self->{btn_next}->SetMinSize(Wx::Size->new(75, 23));
-$self->{btn_next}->SetBackgroundColour(Wx::Colour->new(255, 255, 255));
-$self->{btn_next}->Enable(0);
-$self->{btn_print}->SetMinSize(Wx::Size->new(75, 23));
-$self->{btn_print}->SetBackgroundColour(Wx::Colour->new(255, 255, 255));
-$self->{btn_print}->Enable(0);
-# end wxGlade
-}
-
-
-################################################################################
-sub __do_layout {
-	my $self = shift;
-
-# begin wxGlade: MyFrame::__do_layout
-$self->{sizer_main} = Wx::BoxSizer->new(wxVERTICAL);
-$self->{sizer_buttons} = Wx::BoxSizer->new(wxHORIZONTAL);
-$self->{sizer_5} = Wx::BoxSizer->new(wxVERTICAL);
-$self->{sizer_4} = Wx::BoxSizer->new(wxHORIZONTAL);
-$self->{sizer_1} = Wx::BoxSizer->new(wxHORIZONTAL);
-$self->{sizer_3} = Wx::BoxSizer->new(wxVERTICAL);
-$self->{sizer_2} = Wx::BoxSizer->new(wxVERTICAL);
-$self->{sizer_nb_dom_pane} = Wx::BoxSizer->new(wxHORIZONTAL);
-$self->{sz_package_details} = Wx::BoxSizer->new(wxVERTICAL);
-$self->{sz_items_staticbox}->Lower();
-$self->{sz_items} = Wx::StaticBoxSizer->new($self->{sz_items_staticbox}, wxVERTICAL);
-$self->{sz_grid_items} = Wx::BoxSizer->new(wxHORIZONTAL);
-$self->{sz_name_addr_weight} = Wx::BoxSizer->new(wxHORIZONTAL);
-$self->{sz_weight_mail} = Wx::BoxSizer->new(wxVERTICAL);
-$self->{sz_packaging_type_staticbox}->Lower();
-$self->{sz_packaging_type} = Wx::StaticBoxSizer->new($self->{sz_packaging_type_staticbox}, wxHORIZONTAL);
-$self->{sz_pkg_details} = Wx::BoxSizer->new(wxVERTICAL);
-$self->{sz_mail_hideButton} = Wx::BoxSizer->new(wxHORIZONTAL);
-$self->{sz_weight_staticbox}->Lower();
-$self->{sz_weight} = Wx::StaticBoxSizer->new($self->{sz_weight_staticbox}, wxVERTICAL);
-$self->{gsz_lbs_oz} = Wx::FlexGridSizer->new(2, 2, 2, 2);
-$self->{sz_panel_notes_staticbox}->Lower();
-$self->{sz_panel_notes} = Wx::StaticBoxSizer->new($self->{sz_panel_notes_staticbox}, wxVERTICAL);
-$self->{sizer_7} = Wx::BoxSizer->new(wxVERTICAL);
-$self->{sz_name_address_staticbox}->Lower();
-$self->{sz_name_address} = Wx::StaticBoxSizer->new($self->{sz_name_address_staticbox}, wxVERTICAL);
-$self->{sz_status_disp_toggle} = Wx::BoxSizer->new(wxHORIZONTAL);
-$self->{sz_ship_date_staticbox}->Lower();
-$self->{sz_ship_date} = Wx::StaticBoxSizer->new($self->{sz_ship_date_staticbox}, wxHORIZONTAL);
-$self->{sz_status_disp_toggle}->Add($self->{rb_package_display}, 0, wxALIGN_BOTTOM|wxALL, 8);
-$self->{sz_status_disp_toggle}->Add(5, 20, 1, 0, 0);
-$self->{sz_status_disp_toggle}->Add($self->{lbl_status}, 0, wxALIGN_BOTTOM|wxALL, 10);
-$self->{sz_status_disp_toggle}->Add(5, 20, 1, 0, 0);
-$self->{sz_status_disp_toggle}->Add($self->{bitmap_1}, 0, wxALIGN_RIGHT, 0);
-$self->{sz_ship_date}->Add($self->{tc_advDays}, 0, wxALIGN_BOTTOM|wxALL, 5);
-$self->{sz_ship_date}->Add($self->{lbl_days}, 0, wxALIGN_BOTTOM|wxALIGN_CENTER_VERTICAL|wxALL, 5);
-$self->{sz_status_disp_toggle}->Add($self->{sz_ship_date}, 0, wxALIGN_BOTTOM|wxALIGN_RIGHT|wxALL, 8);
-$self->{panel_header}->SetSizer($self->{sz_status_disp_toggle});
-$self->{sizer_main}->Add($self->{panel_header}, 0, wxEXPAND, 0);
-$self->{sz_name_address}->Add($self->{lbl_buyer}, 0, wxALL|wxEXPAND, 5);
-$self->{sz_name_address}->Add($self->{lbl_address}, 1, wxALL|wxEXPAND, 5);
-$self->{sz_name_addr_weight}->Add($self->{sz_name_address}, 1, wxEXPAND|wxRIGHT, 5);
-$self->{sizer_7}->Add($self->{lbl_notes}, 0, wxALL|wxEXPAND, 5);
-$self->{panel_notes}->SetSizer($self->{sizer_7});
-$self->{sz_panel_notes}->Add($self->{panel_notes}, 1, wxALL|wxEXPAND, 5);
-$self->{panel_hide_notes}->SetSizer($self->{sz_panel_notes});
-$self->{sz_name_addr_weight}->Add($self->{panel_hide_notes}, 0, wxEXPAND|wxRIGHT, 5);
-$self->{gsz_lbs_oz}->Add($self->{lbl_lbs}, 0, 0, 0);
-$self->{gsz_lbs_oz}->Add($self->{lbl_oz}, 0, 0, 0);
-$self->{gsz_lbs_oz}->Add($self->{tc_lbs}, 0, wxALIGN_RIGHT|wxBOTTOM|wxRIGHT|wxTOP, 5);
-$self->{gsz_lbs_oz}->Add($self->{tc_oz}, 0, wxALIGN_RIGHT|wxBOTTOM|wxRIGHT|wxTOP, 5);
-$self->{sz_weight}->Add($self->{gsz_lbs_oz}, 1, wxALIGN_RIGHT|wxALL, 5);
-$self->{sz_weight_mail}->Add($self->{sz_weight}, 0, wxBOTTOM|wxEXPAND|wxRIGHT, 10);
-$self->{sz_mail_hideButton}->Add($self->{choice_mailclass}, 1, wxALIGN_BOTTOM|wxALIGN_RIGHT|wxEXPAND|wxRIGHT, 5);
-$self->{sz_mail_hideButton}->Add($self->{btn_send_email}, 0, wxALIGN_BOTTOM|wxALIGN_RIGHT|wxEXPAND|wxRIGHT, 5);
-$self->{sz_mail_hideButton}->Add($self->{btn_hidenotes}, 0, wxALIGN_BOTTOM|wxALIGN_RIGHT|wxEXPAND, 0);
-$self->{sz_weight_mail}->Add($self->{sz_mail_hideButton}, 0, wxBOTTOM|wxLEFT|wxRIGHT, 10);
-$self->{sz_pkg_details}->Add($self->{dd_packaging}, 1, wxEXPAND, 0);
-$self->{sz_pkg_details}->Add(5, 5, 0, 0, 0);
-$self->{sz_pkg_details}->Add($self->{dd_bubble_wrap}, 1, wxEXPAND, 0);
-$self->{sz_packaging_type}->Add($self->{sz_pkg_details}, 1, 0, 0);
-$self->{sz_packaging_type}->Add($self->{btn_save_pkg}, 0, wxALIGN_BOTTOM|wxALIGN_RIGHT|wxEXPAND|wxLEFT|wxRIGHT, 5);
-$self->{sz_weight_mail}->Add($self->{sz_packaging_type}, 1, wxBOTTOM|wxEXPAND|wxRIGHT, 10);
-$self->{sz_name_addr_weight}->Add($self->{sz_weight_mail}, 0, wxEXPAND, 0);
-$self->{sz_package_details}->Add($self->{sz_name_addr_weight}, 0, wxEXPAND, 5);
-$self->{sz_grid_items}->Add($self->{grid_items}, 1, wxALL|wxEXPAND, 10);
-$self->{panel_griditems}->SetSizer($self->{sz_grid_items});
-$self->{sz_items}->Add($self->{panel_griditems}, 1, wxEXPAND, 5);
-$self->{sz_package_details}->Add($self->{sz_items}, 1, wxALL|wxEXPAND, 5);
-$self->{nb_individual_pane}->SetSizer($self->{sz_package_details});
-$self->{sizer_nb_dom_pane}->Add($self->{grid_batch}, 1, wxBOTTOM|wxEXPAND|wxTOP, 5);
-$self->{nb_batch_pane}->SetSizer($self->{sizer_nb_dom_pane});
-$self->{sizer_2}->Add($self->{lbl_configuration_file}, 0, wxALL|wxEXPAND, 3);
-$self->{sizer_2}->Add($self->{lbl_environment}, 0, wxALL|wxEXPAND, 3);
-$self->{sizer_2}->Add($self->{lbl_database}, 0, wxALL|wxEXPAND, 3);
-$self->{sizer_2}->Add($self->{lbl_database_type}, 0, wxALL|wxEXPAND, 3);
-$self->{sizer_2}->Add($self->{lbl_user}, 0, wxALL|wxEXPAND, 3);
-$self->{sizer_2}->Add($self->{lbl_password}, 0, wxALL|wxEXPAND, 3);
-$self->{sizer_2}->Add($self->{lbl_installed_location}, 0, wxALL|wxEXPAND, 3);
-$self->{sizer_1}->Add($self->{sizer_2}, 0, wxEXPAND|wxLEFT|wxTOP, 5);
-$self->{sizer_3}->Add($self->{btn_config_file_chooser}, 0, wxALL, 3);
-$self->{sizer_3}->Add($self->{dd_config_environment}, 0, wxALL, 3);
-$self->{sizer_3}->Add($self->{tc_config_database}, 0, wxALL, 3);
-$self->{sizer_3}->Add($self->{tc_config_db_type}, 0, wxALL, 3);
-$self->{sizer_3}->Add($self->{tc_config_user}, 0, wxALL, 3);
-$self->{sizer_3}->Add($self->{tc_config_password}, 0, wxALL, 3);
-$self->{sizer_3}->Add($self->{tc_config_installed_location}, 0, wxALL, 3);
-$self->{sizer_3}->Add($self->{btn_config_test}, 0, wxALL, 3);
-$self->{sizer_1}->Add($self->{sizer_3}, 0, wxEXPAND|wxTOP, 5);
-$self->{nb_configuration}->SetSizer($self->{sizer_1});
-$self->{sizer_4}->Add($self->{lbl_log}, 0, wxALL|wxEXPAND, 5);
-$self->{nb_log}->SetSizer($self->{sizer_4});
-$self->{sizer_5}->Add($self->{tc_name_address}, 1, wxALL|wxEXPAND, 5);
-$self->{nb_misc}->SetSizer($self->{sizer_5});
-$self->{nb_main}->AddPage($self->{nb_individual_pane}, "Individual");
-$self->{nb_main}->AddPage($self->{nb_batch_pane}, "Batch");
-$self->{nb_main}->AddPage($self->{nb_configuration}, "Configuration");
-$self->{nb_main}->AddPage($self->{nb_log}, "Log");
-$self->{nb_main}->AddPage($self->{nb_misc}, "Misc");
-$self->{sizer_main}->Add($self->{nb_main}, 1, wxALIGN_BOTTOM|wxEXPAND, 0);
-$self->{sizer_buttons}->Add($self->{image_logo}, 0, wxALIGN_CENTER_VERTICAL|wxEXPAND|wxFIXED_MINSIZE, 3);
-$self->{sizer_buttons}->Add(20, 20, 1, wxEXPAND, 0);
-$self->{sizer_buttons}->Add($self->{btn_stage}, 0, wxALIGN_RIGHT|wxALL|wxEXPAND, 2);
-$self->{sizer_buttons}->Add($self->{btn_prev}, 0, wxALIGN_RIGHT|wxALL|wxEXPAND, 2);
-$self->{sizer_buttons}->Add($self->{btn_next}, 0, wxALIGN_RIGHT|wxALL|wxEXPAND, 2);
-$self->{sizer_buttons}->Add($self->{btn_print}, 0, wxALIGN_RIGHT|wxALL|wxEXPAND, 2);
-$self->{sizer_main}->Add($self->{sizer_buttons}, 0, wxEXPAND, 0);
-$self->SetSizer($self->{sizer_main});
-$self->Layout();
-$self->Centre();
-# end wxGlade
-}
 
 
 ################################################################################
@@ -1721,7 +1793,7 @@ sub btn_config_test_onClick {
 #     }
 #     else {
 
-    # Open LOCAL database connection
+    # get database connection
     $self->{dbh} =
       DBI->connect( "DBI:$self->{cfg}->{db_type}:$self->{cfg}->{database}",
                     $self->{cfg}->{db_user},
@@ -2263,6 +2335,14 @@ my ($self, $event) = @_;
 
 }
 
+
+sub btn_admin_upd_skus_onClick {
+  # wxGlade: MyFrame::btn_admin_upd_skus_onClick <event_handler>
+  # end wxGlade
+  my ($self, $event) = @_;
+  $self->{lbl_admin}->SetLabel("This is the output from the calling reviseSkus program");
+}
+
 # end of class MyFrame
 
 #################################################################################
@@ -2294,8 +2374,6 @@ sub Draw {
 }
 1;
 
-1;
-
 package main;
 
 unless(caller) {
@@ -2312,5 +2390,6 @@ unless(caller) {
 	$frame_1->Show(1);
 	$app->MainLoop();
 }
+1;
 
 
