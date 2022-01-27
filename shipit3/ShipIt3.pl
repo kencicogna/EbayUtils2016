@@ -31,6 +31,7 @@ use Storable 'dclone';
 use lib 'lib';
 use ShipItPackageList;
 use ShipItEbayAPICall;
+use ShipItEbayAPICallGetActiveListings;
 use EndiciaAPICall;
 
 # Package level config
@@ -79,7 +80,7 @@ $style = wxCAPTION|wxCLOSE_BOX|wxFULL_REPAINT_ON_RESIZE|wxMAXIMIZE_BOX|wxMINIMIZ
 unless defined $style;
 
 $self = $self->SUPER::new( $parent, $id, $title, $pos, $size, $style, $name );
-$self->SetSize(Wx::Size->new(1392, 904));
+$self->SetSize(Wx::Size->new(1392, 884));
 $self->SetTitle("The Teaching Toy Box - SHIP IT!");
 $self->SetBackgroundColour(Wx::Colour->new(255, 255, 255));
 
@@ -386,9 +387,9 @@ $self->{btn_admin_upd_skus}->SetMinSize(Wx::Size->new(280, 60));
 $self->{btn_admin_upd_skus}->SetFont(Wx::Font->new(12, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, 0, ""));
 $self->{sizer_6}->Add($self->{btn_admin_upd_skus}, 0, wxALL, 20);
 
-my $lbl_admin = Wx::StaticText->new($self->{nb_admin}, wxID_ANY, "lbl_admin output", wxDefaultPosition, wxDefaultSize, wxALIGN_LEFT);
-$lbl_admin->SetFont(Wx::Font->new(12, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, 0, ""));
-$self->{sizer_6}->Add($lbl_admin, 0, 0, 0);
+$self->{lbl_admin} = Wx::StaticText->new($self->{nb_admin}, wxID_ANY, "lbl_admin output", wxDefaultPosition, wxDefaultSize, wxALIGN_LEFT);
+$self->{lbl_admin}->SetFont(Wx::Font->new(12, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, 0, ""));
+$self->{sizer_6}->Add($self->{lbl_admin}, 0, 0, 0);
 
 $self->{sizer_buttons} = Wx::BoxSizer->new(wxHORIZONTAL);
 $self->{sizer_main}->Add($self->{sizer_buttons}, 0, wxEXPAND, 0);
@@ -684,9 +685,7 @@ sub banner {
         'important' => [191,0,8],     # red
         'warning'   => [251,200,47],  # yellow
         'ok'        => [123,212,6],   # green
-#        'info'      => [13,117,152],  # blue
         'info'      => [211,236,240],  # blue
-#        'note'      => [240,96,0],    # orange
         'note'      => [211,236,240],  # blue
         'misc'      => [180,180,180], # grey 
       );
@@ -2340,10 +2339,23 @@ sub btn_admin_upd_skus_onClick {
   # wxGlade: MyFrame::btn_admin_upd_skus_onClick <event_handler>
   # end wxGlade
   my ($self, $event) = @_;
-  $self->{lbl_admin}->SetLabel("This is the output from the calling reviseSkus program");
+	my $activeListings; 
+
+  $self->banner( 'info', "Loading Active Listings....." ); 
+
+	# Ebay API call - Get Orders awaiting shipment
+	my $objActiveListings = ShipItEbayAPICallGetActiveListings->new( environment=>'production' );
+	$objActiveListings->sendRequest;
+
+	#for my $item ( @{ $objOrders->activeListings } ) {
+	#  get sku
+	#}
+
+  $self->{lbl_admin}->SetLabel("SKU check complete");
 }
 
 # end of class MyFrame
+
 
 #################################################################################
 # Adding an image to a grid cell (the hard way!)
@@ -2374,6 +2386,10 @@ sub Draw {
 }
 1;
 
+
+#################################################################################
+# MAIN
+#################################################################################
 package main;
 
 unless(caller) {
