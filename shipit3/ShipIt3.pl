@@ -2342,6 +2342,7 @@ sub btn_admin_upd_skus_onClick {
 	my $activeListings; 
 
   $self->banner( 'info', "Loading Active Listings....." ); 
+  $self->{lbl_admin}->SetLabel("SKU check starting...");
 
 	# Ebay API call - Get Orders awaiting shipment
 	my $objActiveListings = ShipItEbayAPICallGetActiveListings->new( environment=>'production' );

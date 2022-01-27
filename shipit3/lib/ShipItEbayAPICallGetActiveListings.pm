@@ -21,7 +21,7 @@ extends 'ShipItEbayAPICallBase';
 # Attributes
 #-------------------------------------------------------------------------------
 
-has activelistings      => ( is => 'rw', isa => 'ArrayRef'          );  # Result - Order details array reference
+has activeListings      => ( is => 'rw', isa => 'ArrayRef'          );  # Result - Order details array reference
 
 # override parent attributes
 has +callName           => ( is => 'rw', isa => 'Str', default=>'GetMyeBaySelling' );  # e.g. 'CompleteSale'
@@ -57,6 +57,13 @@ sub _setCallNameSpecificInfo {
 			  </Pagination>
 			</ActiveList>
 
+			<OutputSelector>TotalNumberOfPages</OutputSelector>
+			<OutputSelector>ItemID</OutputSelector>
+			<OutputSelector>Title</OutputSelector>
+			<OutputSelector>SKU</OutputSelector>
+			<OutputSelector>VariationTitle</OutputSelector>
+			<OutputSelector>SellingStatus</OutputSelector>
+
       </$api_call_name_tag>
 REQUEST_XML
 
@@ -89,16 +96,21 @@ sub sendRequest {
     $self->{requestXML} =~ s/__PAGE_NUMBER__/$pagenumber/g;
 
 		# Make API call
-    my $responseObj = $self->submitXMLPostRequest();
+    my $response = $self->submitXMLPostRequest();
 
 		# Pagination - we have to handle it here since the TotalNumerOfPages tag can be in different places
     if ( $pagenumber==1 ) {
-      die if ( ! defined $responseObj->{ActiveList}->{PaginationResult}->{TotalNumberOfPages} );
-      $maxpages = $responseObj->{ActiveList}->{PaginationResult}->{TotalNumberOfPages};
+      die if ( ! defined $response->{ActiveList}->{PaginationResult}->{TotalNumberOfPages} );
+      $maxpages = $response->{ActiveList}->{PaginationResult}->{TotalNumberOfPages};
     }
 
 		# get items from this page of results 
-    for my $item  ( @{$responseObj->{ActiveList}->{ItemArray}->{Item}} ) {
+    for my $item  ( @{$response->{ActiveList}->{ItemArray}->{Item}} ) {
+
+			# Ignore listings on foreign sites 
+			# TODO: This is not perfect, ideally we need to call getItem API to get the actual Site, unfortunately this API does not return it.
+			next if ( defined $item->{SellingStatus}->{ConvertedCurrentPrice} );
+
       push( @$all_items, $item );
     }
 
@@ -109,6 +121,11 @@ sub sendRequest {
   while ( $pagenumber <= $maxpages );
 
   $self->activeListings( $all_items );
+
+	print "\n\n",Dumper($self->activeListings);
+	my $cnt = @{ $self->activeListings };
+	print "\n\n-- cnt=$cnt -------------------------------------\n\n";
+	exit;
 
 } # end sendRequest
 

@@ -106,8 +106,7 @@ sub submitXMLPostRequest {
 
   # API call
   my $objResponse = $objUserAgent->request($objRequest);
-	print "\n\n-- RESPONSE OBJECT --------------------------------------------------------------------------\n\n";
-	print Dumper($objResponse); exit;
+	#print Dumper($objResponse); exit;
 
   # Parse response object to get Acknowledgement 
   my $response_hash = XMLin( $objResponse->content, ForceArray=>$self->XMLinForceArray );
@@ -128,7 +127,7 @@ sub submitXMLPostRequest {
     die "Status          : API Call Failed.";
   }
 
-	return $objResponse->content;
+	return $response_hash;
 
 } # end sendRequest()
 
