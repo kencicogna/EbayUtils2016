@@ -111,7 +111,7 @@ sub submitXMLPostRequest {
   # Parse response object to get Acknowledgement 
   my $response_hash = XMLin( $objResponse->content, ForceArray=>$self->XMLinForceArray );
   my $ack = $response_hash->{Ack};
-  print "Response status : $ack\n";
+	#print "Response status : $ack\n";
 
   if ($objResponse->is_error || $ack !~ /success/i ) {
     print "Response msg.   : ", Dumper( $response_hash->{Errors} );

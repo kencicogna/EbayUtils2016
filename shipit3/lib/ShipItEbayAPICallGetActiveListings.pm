@@ -117,15 +117,18 @@ sub sendRequest {
     print STDERR "\nActive Listing Page: $pagenumber / $maxpages";
 
     $pagenumber++;
+
+		# TODO: testing - remove this line
+		#$pagenumber = 100;
   }
   while ( $pagenumber <= $maxpages );
 
   $self->activeListings( $all_items );
 
-	print "\n\n",Dumper($self->activeListings);
-	my $cnt = @{ $self->activeListings };
-	print "\n\n-- cnt=$cnt -------------------------------------\n\n";
-	exit;
+	#	print "\n\n",Dumper($self->activeListings);
+	# my $cnt = @{ $self->activeListings };
+	# print "\n\n-- cnt=$cnt -------------------------------------\n\n";
+	# exit;
 
 } # end sendRequest
 
