@@ -11,7 +11,7 @@ use Cwd;
 use DBI;
 use POSIX qw/strftime/;
 use XML::Simple qw(XMLin XMLout);
-use XML::LibXML::PrettyPrint;
+#use XML::LibXML::PrettyPrint;
 use File::Slurp 'read_file';
 use File::Copy 'move';
 use Data::Dumper 'Dumper';

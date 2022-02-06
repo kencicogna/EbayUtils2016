@@ -31,6 +31,7 @@ use Storable 'dclone';
 use lib 'lib';
 use ShipItPackageList;
 use ShipItEbayAPICall;
+use ShipItEbayAPICallGetActiveListings;
 use EndiciaAPICall;
 
 # Package level config
@@ -79,7 +80,7 @@ $style = wxCAPTION|wxCLOSE_BOX|wxFULL_REPAINT_ON_RESIZE|wxMAXIMIZE_BOX|wxMINIMIZ
 unless defined $style;
 
 $self = $self->SUPER::new( $parent, $id, $title, $pos, $size, $style, $name );
-$self->SetSize(Wx::Size->new(1392, 904));
+$self->SetSize(Wx::Size->new(1392, 884));
 $self->SetTitle("The Teaching Toy Box - SHIP IT!");
 $self->SetBackgroundColour(Wx::Colour->new(255, 255, 255));
 
@@ -376,19 +377,20 @@ $self->{tc_name_address}->SetMinSize(Wx::Size->new(-1, 70));
 $self->{tc_name_address}->SetFont(Wx::Font->new(20, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, 0, ""));
 $self->{sizer_5}->Add($self->{tc_name_address}, 1, wxALL|wxEXPAND, 5);
 
-$self->{nb_admin} = Wx::Panel->new($self->{nb_main}, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_SIMPLE|wxTAB_TRAVERSAL);
+$self->{nb_admin} = Wx::ScrolledWindow->new($self->{nb_main}, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
+$self->{nb_admin}->SetScrollRate(10, 10);
 $self->{nb_main}->AddPage($self->{nb_admin}, "Admin");
 
 $self->{sizer_6} = Wx::BoxSizer->new(wxVERTICAL);
 
-$self->{btn_admin_upd_skus} = Wx::Button->new($self->{nb_admin}, wxID_ANY, "Click here to\nAssign/Verify SKUS (Custom Labels)");
+$self->{btn_admin_upd_skus} = Wx::Button->new($self->{nb_admin}, wxID_ANY, "Click here to fix SKU's (Custom Labels)");
 $self->{btn_admin_upd_skus}->SetMinSize(Wx::Size->new(280, 60));
 $self->{btn_admin_upd_skus}->SetFont(Wx::Font->new(12, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, 0, ""));
 $self->{sizer_6}->Add($self->{btn_admin_upd_skus}, 0, wxALL, 20);
 
-my $lbl_admin = Wx::StaticText->new($self->{nb_admin}, wxID_ANY, "lbl_admin output", wxDefaultPosition, wxDefaultSize, wxALIGN_LEFT);
-$lbl_admin->SetFont(Wx::Font->new(12, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, 0, ""));
-$self->{sizer_6}->Add($lbl_admin, 0, 0, 0);
+$self->{lbl_admin} = Wx::StaticText->new($self->{nb_admin}, wxID_ANY, "lbl_admin output", wxDefaultPosition, wxDefaultSize, wxALIGN_LEFT);
+$self->{lbl_admin}->SetFont(Wx::Font->new(12, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, 0, ""));
+$self->{sizer_6}->Add($self->{lbl_admin}, 0, wxBOTTOM|wxLEFT|wxRIGHT, 20);
 
 $self->{sizer_buttons} = Wx::BoxSizer->new(wxHORIZONTAL);
 $self->{sizer_main}->Add($self->{sizer_buttons}, 0, wxEXPAND, 0);
@@ -684,9 +686,7 @@ sub banner {
         'important' => [191,0,8],     # red
         'warning'   => [251,200,47],  # yellow
         'ok'        => [123,212,6],   # green
-#        'info'      => [13,117,152],  # blue
         'info'      => [211,236,240],  # blue
-#        'note'      => [240,96,0],    # orange
         'note'      => [211,236,240],  # blue
         'misc'      => [180,180,180], # grey 
       );
@@ -2340,10 +2340,74 @@ sub btn_admin_upd_skus_onClick {
   # wxGlade: MyFrame::btn_admin_upd_skus_onClick <event_handler>
   # end wxGlade
   my ($self, $event) = @_;
-  $self->{lbl_admin}->SetLabel("This is the output from the calling reviseSkus program");
+	my $activeListings; 
+
+  $self->banner( 'info', "Loading Active Listings....." ); 
+  $self->{lbl_admin}->SetLabel("SKU check starting...");
+
+	# Ebay API call - Get Orders awaiting shipment
+	my $objActiveListings = ShipItEbayAPICallGetActiveListings->new( environment=>'production' );
+	$objActiveListings->sendRequest;
+
+	# Get all sku's
+	print "\nGetting list of all SKUs";
+	my $allSkus = {};
+	for my $item ( @{ $objActiveListings->activeListings } ) {
+		$allSkus->{$item->{SKU}}++;
+
+		if ( defined $item->{Varitions} ) {
+			for my $v ( @{ $item->{Variations}->{Variation} } ) {
+		    $allSkus->{$v->{SKU}}++;
+			}
+		}
+	}
+
+	print "\nChecking for missing or duplicate skus";
+  my $display='';
+	for my $item ( sort { $a->{SKU} <=> $b->{SKU} } @{ $objActiveListings->activeListings } ) {
+
+		# Check for missing skus
+		my $nosku=0;
+		my $dupsku=0;
+		$nosku++  if ( ! $item->{SKU} );
+		$dupsku++ if ( $allSkus->{$item->{SKU}} > 1 );
+
+		if ( defined $item->{Varitions} ) {
+			for my $v ( @{ $item->{Variations}->{Variation} } ) {
+				$nosku++  if ( ! $v->{SKU} );
+		    $dupsku++ if ( $allSkus->{$v->{SKU}} > 1 );
+			}
+		}
+
+		# display issues
+		my $err='';
+		if ( $nosku or $dupsku ) {
+	    $display .= "\nItemID = $item->{ItemID}";
+		  $display .= "\nTitle  = $item->{Title}";
+			$err='(No SKU)' if ( ! $item->{SKU} );
+		  $err='(Duplicate SKU)' if ( $allSkus->{$item->{SKU}} > 1 );
+		  $display .= "\nSKU    = $item->{SKU} $err";
+			if ( defined $item->{Varitions} ) {
+				for my $v ( @{ $item->{Variations}->{Variation} } ) {
+					if ( ! $v->{SKU} ) {
+			      $err='(No SKU)' if ( ! $v->{SKU} );
+		        $err='(Duplicate SKU)' if ( $allSkus->{$v->{SKU}} > 1 );
+						$display .= "\n  Variation = $v->{VariationTitle}";
+						$display .= "\n  Var SKU   = $v->{SKU} $err"; 
+				  }
+				}
+			}
+		}
+
+	}
+
+	$display .= "\n\nSKU Check complete\n";
+	print STDERR $display;
+  $self->{lbl_admin}->SetLabel("$display");
 }
 
 # end of class MyFrame
+
 
 #################################################################################
 # Adding an image to a grid cell (the hard way!)
@@ -2374,6 +2438,10 @@ sub Draw {
 }
 1;
 
+
+#################################################################################
+# MAIN
+#################################################################################
 package main;
 
 unless(caller) {
