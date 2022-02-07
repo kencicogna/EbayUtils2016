@@ -80,7 +80,7 @@ $style = wxCAPTION|wxCLOSE_BOX|wxFULL_REPAINT_ON_RESIZE|wxMAXIMIZE_BOX|wxMINIMIZ
 unless defined $style;
 
 $self = $self->SUPER::new( $parent, $id, $title, $pos, $size, $style, $name );
-$self->SetSize(Wx::Size->new(1392, 884));
+$self->SetSize(Wx::Size->new(1186, 884));
 $self->SetTitle("The Teaching Toy Box - SHIP IT!");
 $self->SetBackgroundColour(Wx::Colour->new(255, 255, 255));
 
@@ -120,7 +120,7 @@ $self->{sz_status_disp_toggle}->Add($self->{lbl_status}, 0, wxALIGN_BOTTOM|wxALL
 
 $self->{sz_status_disp_toggle}->Add(5, 20, 1, 0, 0);
 
-$self->{bitmap_1} = Wx::StaticBitmap->new($self->{panel_header}, wxID_ANY, Wx::Bitmap->new("C:\\Users\\Ken\\Pictures\\dear blue background.png", wxBITMAP_TYPE_ANY));
+$self->{bitmap_1} = Wx::StaticBitmap->new($self->{panel_header}, wxID_ANY, Wx::Bitmap->new("images/dear.png", wxBITMAP_TYPE_ANY));
 $self->{sz_status_disp_toggle}->Add($self->{bitmap_1}, 0, 0, 0);
 
 $self->{sz_ship_date} = Wx::StaticBoxSizer->new(Wx::StaticBox->new($self->{panel_header}, wxID_ANY, "Advance Ship Date"), wxHORIZONTAL);
@@ -388,9 +388,93 @@ $self->{btn_admin_upd_skus}->SetMinSize(Wx::Size->new(280, 60));
 $self->{btn_admin_upd_skus}->SetFont(Wx::Font->new(12, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, 0, ""));
 $self->{sizer_6}->Add($self->{btn_admin_upd_skus}, 0, wxALL, 20);
 
-$self->{lbl_admin} = Wx::StaticText->new($self->{nb_admin}, wxID_ANY, "lbl_admin output", wxDefaultPosition, wxDefaultSize, wxALIGN_LEFT);
-$self->{lbl_admin}->SetFont(Wx::Font->new(12, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, 0, ""));
-$self->{sizer_6}->Add($self->{lbl_admin}, 0, wxBOTTOM|wxLEFT|wxRIGHT, 20);
+$self->{tc_admin_output} = Wx::TextCtrl->new($self->{nb_admin}, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxTE_MULTILINE|wxTE_READONLY);
+$self->{sizer_6}->Add($self->{tc_admin_output}, 1, wxBOTTOM|wxEXPAND|wxLEFT|wxRIGHT, 20);
+
+$self->{nb_inventory} = Wx::ScrolledWindow->new($self->{nb_main}, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
+$self->{nb_inventory}->SetScrollRate(10, 10);
+$self->{nb_main}->AddPage($self->{nb_inventory}, "Inventory");
+
+$self->{sizer_8} = Wx::BoxSizer->new(wxVERTICAL);
+
+$self->{sizer_11} = Wx::StaticBoxSizer->new(Wx::StaticBox->new($self->{nb_inventory}, wxID_ANY, "Search Products"), wxVERTICAL);
+$self->{sizer_8}->Add($self->{sizer_11}, 0, wxALL|wxEXPAND, 10);
+
+$self->{tc_nb_inv_search_bar} = Wx::TextCtrl->new($self->{nb_inventory}, wxID_ANY, "");
+$self->{tc_nb_inv_search_bar}->SetMinSize(Wx::Size->new(-1, 35));
+$self->{sizer_11}->Add($self->{tc_nb_inv_search_bar}, 0, wxALL|wxEXPAND, 5);
+
+$self->{nb_inventory_search_results} = Wx::Notebook->new($self->{nb_inventory}, wxID_ANY);
+$self->{sizer_8}->Add($self->{nb_inventory_search_results}, 1, wxEXPAND, 0);
+
+$self->{nb_inv_item_matches} = Wx::Panel->new($self->{nb_inventory_search_results}, wxID_ANY);
+$self->{nb_inventory_search_results}->AddPage($self->{nb_inv_item_matches}, "Item Matches");
+
+$self->{grid_sizer_4} = Wx::FlexGridSizer->new(3, 3, 5, 5);
+
+$self->{grid_sizer_4}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_4}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_4}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_4}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_4}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_4}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_4}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_4}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_4}->Add(0, 0, 0, 0, 0);
+
+$self->{nb_inv_item_update} = Wx::Panel->new($self->{nb_inventory_search_results}, wxID_ANY);
+$self->{nb_inventory_search_results}->AddPage($self->{nb_inv_item_update}, "Update Item");
+
+$self->{grid_sizer_2} = Wx::FlexGridSizer->new(3, 3, 5, 5);
+
+$self->{grid_sizer_2}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_2}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_2}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_2}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_2}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_2}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_2}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_2}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_2}->Add(0, 0, 0, 0, 0);
+
+$self->{nb_inv_variations_update} = Wx::Panel->new($self->{nb_inventory_search_results}, wxID_ANY);
+$self->{nb_inventory_search_results}->AddPage($self->{nb_inv_variations_update}, "Update Varitions");
+
+$self->{grid_sizer_3} = Wx::FlexGridSizer->new(3, 3, 5, 5);
+
+$self->{grid_sizer_3}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_3}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_3}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_3}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_3}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_3}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_3}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_3}->Add(0, 0, 0, 0, 0);
+
+$self->{grid_sizer_3}->Add(0, 0, 0, 0, 0);
 
 $self->{sizer_buttons} = Wx::BoxSizer->new(wxHORIZONTAL);
 $self->{sizer_main}->Add($self->{sizer_buttons}, 0, wxEXPAND, 0);
@@ -424,6 +508,14 @@ $self->{btn_print}->SetMinSize(Wx::Size->new(75, 23));
 $self->{btn_print}->SetBackgroundColour(Wx::Colour->new(255, 255, 255));
 $self->{btn_print}->Enable(0);
 $self->{sizer_buttons}->Add($self->{btn_print}, 0, wxALL|wxEXPAND, 2);
+
+$self->{nb_inv_variations_update}->SetSizer($self->{grid_sizer_3});
+
+$self->{nb_inv_item_update}->SetSizer($self->{grid_sizer_2});
+
+$self->{nb_inv_item_matches}->SetSizer($self->{grid_sizer_4});
+
+$self->{nb_inventory}->SetSizer($self->{sizer_8});
 
 $self->{nb_admin}->SetSizer($self->{sizer_6});
 
@@ -465,7 +557,14 @@ Wx::Event::EVT_GRID_CMD_SELECT_CELL($self, $self->{grid_batch}->GetId, $self->ca
 Wx::Event::EVT_BUTTON($self, $self->{btn_config_file_chooser}->GetId, $self->can('btn_config_file_chooser_onClick'));
 Wx::Event::EVT_CHOICE($self, $self->{dd_config_environment}->GetId, $self->can('dd_config_environment_evtChoice'));
 Wx::Event::EVT_BUTTON($self, $self->{btn_config_test}->GetId, $self->can('btn_config_test_onClick'));
+
+# Admin tab
 Wx::Event::EVT_BUTTON($self, $self->{btn_admin_upd_skus}->GetId, $self->can('btn_admin_upd_skus_onClick'));
+
+# Inventory tab
+Wx::Event::EVT_TEXT($self, $self->{tc_nb_inv_search_bar}->GetId, $self->can('evt_tc_nb_inv_search_bar_TextChanged'));
+Wx::Event::EVT_TEXT_ENTER($self, $self->{tc_nb_inv_search_bar}->GetId, $self->can('evt_tc_nb_inv_search_bar_TextEnter'));
+
 Wx::Event::EVT_BUTTON($self, $self->{btn_stage}->GetId, $self->can('btn_stage_onClick'));
 Wx::Event::EVT_BUTTON($self, $self->{btn_prev}->GetId, $self->can('btn_prev_onClick'));
 Wx::Event::EVT_BUTTON($self, $self->{btn_next}->GetId, $self->can('btn_next_onClick'));
@@ -615,12 +714,28 @@ Wx::Event::EVT_BUTTON($self, $self->{btn_print}->GetId, $self->can('btn_print_on
   my $cfg = Config::Simple->new();
   $cfg->read($configuration_file) or die $cfg->error();
   my %environment_choices = map { (split /\./)[0] => 1 } keys %{ $cfg->vars() };
+	my $env_idx=0;  # 0 => 'Choose Environment'
+	my $prod_idx=0; 
   for my $environment ( sort keys %environment_choices ) {
+		$env_idx++;
     $self->{dd_config_environment}->Append( $environment );
+
+		# Pre-select production environment
+		if ( $environment =~ /.*production.*/i ) {
+			$prod_idx = $env_idx;
+			$self->{dd_config_environment}->SetSelection($env_idx);
+			$self->dd_config_environment_evtChoice(0);
+		}
   }
 
 	# Start on the select environment page
-  $self->{nb_main}->ChangeSelection(2);
+	if ( $prod_idx > 0 ) {
+    $self->{nb_main}->ChangeSelection(0);  # 'individual' tab
+		$self->nb_main_evtPageChanged(0);
+  }
+  else {
+    $self->{nb_main}->ChangeSelection(2);  # 'config' tab
+  }
 
 	return $self;
 
@@ -769,6 +884,7 @@ sub btn_stage_onClick {
   $self->{packages}->{D}   = [ grep {$_->dom_intl_flag eq 'D' } @{$self->{packages}->{ALL}} ];  # D-Domestic packages
   $self->{packages}->{I}   = [ grep {$_->dom_intl_flag eq 'I' } @{$self->{packages}->{ALL}} ];  # I-International packages
 
+	#print Dumper($self->{packages}->{D}); exit;
 	if (! @{$self->{packages}->{ALL}} ) {
 		$self->banner('warn','Warning: No Packages to Stage');
 		return 1;
@@ -908,59 +1024,9 @@ sub populate_single_page {
   my $row=0;
   for my $item ( @{$pkg->items} ) {
     if ( ! $item->image ) {
-      my $url = $item->image_url;
-      my $image_name = $url;
 
-      #print "\nIMAGE: $image_name";
-      if ( $image_name =~ /^http.*?=.*/ ) {
-        $image_name =~ s#^http.*?=/##;
-        $image_name =~ s#/#_#g;
-      }
-
-      $image_name =~ s#.*/##;
-      $image_name =~ s#\?.*$##;
-      $image_name = "$image_cache/$image_name";
-
-      # get image if from image host, it's not already cached
-      my $status;
-      if ( ! -f $image_name ) {
-        $status = getstore($item->image_url, $image_name);
-      }
-
-      if ( -f $image_name || is_success($status) )  {
-        # Store BitMap image
-	      my $image = Wx::Image->new($image_name, wxBITMAP_TYPE_ANY );
-	      my $h = $image->GetHeight();
-	      my $w = $image->GetWidth();
-	      my $max = $self->{default_rowsize};
-	      if ( $h > $w ) {
-						my $aspect_ratio = $w/$h;
-						$h = $h > $max ? $max : $h;
-						$w = $h * $aspect_ratio;
-	      }
-        else {
-            my $aspect_ratio;
-            eval {
-              $aspect_ratio = $h/$w;
-              $w = $w > $max ? $max : $w;
-              $h = $w * $aspect_ratio;
-            };
-            if ($@) {
-              $|=1;
-              $self->{cfg} = '';
-              print Dumper($self);
-              print "\n\nIMAGE FILE: $image_name \n\n";
-              #exit; #TODO: rescale will fail...
-            }
-        }
-				$image->Rescale($w,$h);
-	      $item->image( Wx::Bitmap->new( $image ) );
-      }
-      else {
-        # assign filler image
-        $item->image( $self->{missing_image} );
-      }
-    }
+		my $image = getBitmapImageFromURL( $item->image_url );
+    $item->image( $image );
 
     # highlight every other row
     my $row_color; 
@@ -1726,15 +1792,19 @@ sub dd_config_environment_evtChoice {
 # wxGlade: MyFrame::dd_config_environment_evtChoice <event_handler>
 # end wxGlade
 
-  my $choiceNbr = $event->GetSelection;
-  return if ($choiceNbr==0);
+	#my $choiceNbr = $event->GetSelection;
+	#return if ($choiceNbr==0);
+	#my $environment = $event->GetString;
+	
+  my $environment_choice_idx = $self->{dd_config_environment}->GetSelection;
+  my $environment_choice = $self->{dd_config_environment}->GetString($environment_choice_idx);
+	return if ( $environment_choice =~ /.*Choose.*/ );
 
-  my $environment      = $event->GetString;
   # TODO: environment could be mandatory in the init block, rather than in the name. That way 
   #       we could also define other environments: dev2, system test, uat, etc...
   #       this way only allows for 'production' and 'development' 
-  my $env              = $environment=~/.*production.*/i ? 'production' : 'development';
-  my $type             = $environment=~/.*production.*/i ? 'important' : 'note';
+  my $env              = $environment_choice=~/.*production.*/i ? 'production' : 'development';
+  my $type             = $environment_choice=~/.*production.*/i ? 'important' : 'note';
   $self->{environment} = $env;
 
   $self->logit('note',"Environment is '$self->{environment}'");
@@ -1747,7 +1817,7 @@ sub dd_config_environment_evtChoice {
   # Create config object
   my $cfg = Config::Simple->new();
   $cfg->read($configuration_file) or die $cfg->error();
-  $self->{cfg} = $cfg->get_block($environment);
+  $self->{cfg} = $cfg->get_block($environment_choice);
 
   $self->{tc_config_database}->SetValue( $self->{cfg}->{database}    );
   $self->{tc_config_db_type}->SetValue ( $self->{cfg}->{db_type}     );
@@ -1762,7 +1832,7 @@ sub dd_config_environment_evtChoice {
   $self->{api} = ShipItEbayAPICall->new( environment=>'production',);
   #print "API OBJECT: ",Dumper($self->{api});
 
-  $self->banner($type,"$environment Environment");
+  $self->banner($type,"$env Environment");
   
   $self->btn_config_test_onClick(0);   # establish db connection
   $self->{connection_active}=1;
@@ -1865,10 +1935,10 @@ sub nb_main_evtPageChanged {
   # Output directories for Postal software
   if ( $self->{batchmode} ) { 
     $self->{grid}->ScrollLines( $self->{current_package_idx}->{ $self->{type} } -2 );
-    $self->{postal_cfg} = $self->{postage_provider_config}->get_block('batch'); # 'batch' is hardcode in cfg/stamps.ini or cfg/endicia.ini
+    $self->{postal_cfg} = $self->{postage_provider_config}->get_block('batch'); # 'batch' is hardcoded in cfg/stamps.ini or cfg/endicia.ini
   }
   else {
-    $self->{postal_cfg} = $self->{postage_provider_config}->get_block('single'); # 'single' is hardcode in  cfg/stamps.ini or cfg/endicia.ini
+    $self->{postal_cfg} = $self->{postage_provider_config}->get_block('single'); # 'single' is hardcoded in  cfg/stamps.ini or cfg/endicia.ini
   }
   # Create the directories if they do not already exist
   for my $key ( keys %{$self->{postal_cfg}} ) {
@@ -2343,11 +2413,13 @@ sub btn_admin_upd_skus_onClick {
 	my $activeListings; 
 
   $self->banner( 'info', "Loading Active Listings....." ); 
-  $self->{lbl_admin}->SetLabel("SKU check starting...");
+  $self->{tc_admin_output}->SetValue("SKU check starting...");
 
 	# Ebay API call - Get Orders awaiting shipment
 	my $objActiveListings = ShipItEbayAPICallGetActiveListings->new( environment=>'production' );
 	$objActiveListings->sendRequest;
+
+  $self->banner( 'info', "Active Listings Loaded. Processing...."); 
 
 	# Get all sku's
 	print "\nGetting list of all SKUs";
@@ -2382,7 +2454,7 @@ sub btn_admin_upd_skus_onClick {
 		# display issues
 		my $err='';
 		if ( $nosku or $dupsku ) {
-	    $display .= "\nItemID = $item->{ItemID}";
+	    $display .= "\n\nItemID = $item->{ItemID}";
 		  $display .= "\nTitle  = $item->{Title}";
 			$err='(No SKU)' if ( ! $item->{SKU} );
 		  $err='(Duplicate SKU)' if ( $allSkus->{$item->{SKU}} > 1 );
@@ -2401,16 +2473,106 @@ sub btn_admin_upd_skus_onClick {
 
 	}
 
-	$display .= "\n\nSKU Check complete\n";
 	print STDERR $display;
-  $self->{lbl_admin}->SetLabel("$display");
+  $self->banner( 'info', "SKU Check Complete."); 
+	$display .= "\n\nSKU Check complete\n";
+  $self->{tc_admin_output}->SetValue("$display");
+}
+
+
+sub evt_tc_nb_inv_search_bar_TextChanged {
+my ($self, $event) = @_;
+# wxGlade: MyFrame::evt_tc_nb_inv_search_bar_TextChanged <event_handler>
+warn "Event handler (evt_tc_nb_inv_search_bar_TextChanged) not implemented";
+$event->Skip;
+# end wxGlade
+}
+
+
+sub evt_tc_nb_inv_search_bar_TextEnter {
+my ($self, $event) = @_;
+# wxGlade: MyFrame::evt_tc_nb_inv_search_bar_TextEnter <event_handler>
+warn "Event handler (evt_tc_nb_inv_search_bar_TextEnter) not implemented";
+$event->Skip;
+# end wxGlade
+}
+
+sub getBitmapImageFromURL
+{
+	my $image_url = shift;
+	my $image_name = $image_url;
+
+	if ( $image_name =~ m#^\s*http.*?//.*#i ) {
+		print "\nMatched pattern";
+		$image_name =~ s#^\s*http.*?//##;
+	}
+
+	$image_name =~ s#.*?/##;
+	$image_name =~ s#/#_#g;
+	$image_name =~ s#\?.*$##;
+	$image_name = "$image_cache/$image_name";
+
+	print "\nURL: '$image_url'";
+	print "\nIMG: '$image_name'";
+	print "\n";
+
+	# If the image file isn't already cached, then try to download the image from the URL and save file in the image cache
+	my $status;
+	if ( ! -f $image_name ) {
+		$status = getstore($image_url, $image_name);
+		if ( is_success($status) )  {
+			if ( ! -f $image_name ) {
+				die "ERROR: 'getstore($image_url, $image_name) returned 'successful' status, but the image file still does not exist";
+			}
+		}
+		# Note: if it didn't succede, we'll add a default image below
+	}
+
+	# If the image file exists, create an image object and resize it
+	if ( -f $image_name ) {
+
+		my $image = Wx::Image->new($image_name, wxBITMAP_TYPE_ANY );
+		my $h = $image->GetHeight();
+		my $w = $image->GetWidth();
+		my $max = $self->{default_rowsize};
+
+		if ( $h > $w ) {
+				my $aspect_ratio = $w/$h;
+				$h = $h > $max ? $max : $h;
+				$w = $h * $aspect_ratio;
+		}
+		else {
+				my $aspect_ratio;
+				eval {
+					$aspect_ratio = $h/$w;
+					$w = $w > $max ? $max : $w;
+					$h = $w * $aspect_ratio;
+				};
+				if ($@) {
+					$|=1;
+					$self->{cfg} = '';
+					print Dumper($self);
+					print "\n\nIMAGE FILE: $image_name \n\n";
+				}
+		}
+		$image->Rescale($w,$h);
+
+		# Turn it into a Bitmap image (instead of JPG?)
+		return Wx::Bitmap->new( $image );
+	}
+	else {
+		# If image still doesn't exist, assign a default 'missing image' (Already a Bitmap image)
+		return $self->{missing_image};
+	}
+
 }
 
 # end of class MyFrame
-
+}
 
 #################################################################################
 # Adding an image to a grid cell (the hard way!)
+#    TODO: There MUST be a better way to do this!
 #################################################################################
 package MyFrame::customImageRenderer; 
 
